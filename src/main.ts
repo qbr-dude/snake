@@ -1,25 +1,22 @@
-import { listenArrows } from "./arrows";
 import { createWatch, isInNotificationPhase } from "./signals";
+
+import { direction } from "./direction";
+import { scheduleTick } from "./tick";
 
 document.addEventListener('DOMContentLoaded', () => {
   // const root = document.querySelector('#app');
 
-  const arrowGetter = listenArrows();
-
   const tickWatcher = createWatch(
     () => {
-      console.log(arrowGetter());
-      
+      console.log(direction());
     },
     (watch) => {
-      if(!isInNotificationPhase()) {
+      if (!isInNotificationPhase()) {
         watch.run();
       }
     },
     false,
   );
 
-  setInterval(() => {
-    tickWatcher.notify();
-  }, 1000)
+  scheduleTick(tickWatcher);
 });
