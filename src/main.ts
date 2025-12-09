@@ -1,14 +1,14 @@
 import { createWatch, isInNotificationPhase } from "./signals";
 
-import { direction } from "./direction";
-import { scheduleTick } from "./tick";
+import { x, y } from "./position";
+import { scheduleUpdate } from "./tick";
 
 document.addEventListener('DOMContentLoaded', () => {
   // const root = document.querySelector('#app');
 
-  const tickWatcher = createWatch(
+  const engineWatcher = createWatch(
     () => {
-      console.log(direction());
+      console.log(x(), y());
     },
     (watch) => {
       if (!isInNotificationPhase()) {
@@ -18,5 +18,5 @@ document.addEventListener('DOMContentLoaded', () => {
     false,
   );
 
-  scheduleTick(tickWatcher);
+  scheduleUpdate(engineWatcher.notify);
 });

@@ -1,12 +1,23 @@
-import { type Watch } from "./signals";
+import { createSignal, type Watch } from "./signals";
 
 const defaultInterval = 1_000;
 
-export const scheduleTick = (watch: Watch): void => {
-    setInterval(() => {
-        requestAnimationFrame(() => {
-            watch.notify();
-        })
-    }, defaultInterval);
+let notifier: Watch['notify'] | undefined = undefined;
 
+const scheduleUpdate = (notify: Watch['notify']): void => {
+    notifier = notify;
 }
+
+const [time, _setTime, updateTime] = createSignal(0);
+
+setInterval(() => requestAnimationFrame(() => {
+    updateTime((lastTime) => lastTime + defaultInterval);
+    notifier && notifier();
+}), defaultInterval);
+
+export {
+    /** How many time was passed since start */
+    time,
+    /**  */
+    scheduleUpdate,
+};

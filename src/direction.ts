@@ -11,8 +11,9 @@ export const Direction = Object.freeze({
 
 export type DirectionType = typeof Direction[keyof typeof Direction];
 
-const isArrowKey = (key: string): key is DirectionType => 
+const isArrowKey = (key: string): key is DirectionType =>
     Object.values(Direction).includes(key as DirectionType);
+
 
 /// OPPOSITE DIRECTIONS
 
@@ -23,8 +24,9 @@ const OppositeDirection = Object.freeze({
     [Direction.Right]: Direction.Left,
 } satisfies Readonly<Record<DirectionType, DirectionType>>);
 
-const isOppositeDirection = (newDirection: DirectionType): boolean => 
+const isOppositeDirection = (newDirection: DirectionType): boolean =>
     direction() !== newDirection && OppositeDirection[direction()] === newDirection;
+
 
 /// SIGNAL
 
@@ -35,7 +37,7 @@ const [direction, setDirection] = createSignal<DirectionType>(defaultDirection);
 /// LISTENERS
 
 const tryToChangeDirection = (arrow: DirectionType): void => {
-    if(isOppositeDirection(arrow)) {
+    if (isOppositeDirection(arrow)) {
         return;
     }
 
@@ -43,8 +45,8 @@ const tryToChangeDirection = (arrow: DirectionType): void => {
 }
 
 document.addEventListener(
-    'keydown', 
+    'keydown',
     e => isArrowKey(e.key) && tryToChangeDirection(e.key)
 );
 
-export {direction};
+export { direction };
