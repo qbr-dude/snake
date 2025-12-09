@@ -3,13 +3,15 @@ import { createLinkedSignal } from "./signals";
 import { Direction, direction, type DirectionType } from "./direction";
 import { time } from "./tick";
 
-interface Position {
+/** Pointer position */
+export interface Position {
     x: number;
     y: number;
 };
 
 /** Default step in px */
 const defaultStep = 10;
+let step = defaultStep;
 
 interface PositionDependencies {
     direction: DirectionType;
@@ -26,10 +28,10 @@ const x = createLinkedSignal<PositionDependencies, Position['x']>(
 
         switch (direction) {
             case Direction.Left: {
-                return value - defaultStep;
+                return value - step;
             }
             case Direction.Right: {
-                return value + defaultStep;
+                return value + step;
             }
             default: {
                 return value;
@@ -48,10 +50,10 @@ const y = createLinkedSignal<PositionDependencies, Position['y']>(
 
         switch (direction) {
             case Direction.Up: {
-                return value - defaultStep;
+                return value - step;
             }
             case Direction.Down: {
-                return value + defaultStep;
+                return value + step;
             }
             default: {
                 return value;
@@ -60,5 +62,7 @@ const y = createLinkedSignal<PositionDependencies, Position['y']>(
     },
 );
 
-export { x, y };
+const setStep = (value: number): void => { step = value };
+
+export { x, y, setStep };
 
