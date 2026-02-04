@@ -1,4 +1,4 @@
-import type { Position } from "../../position";
+import type { Position } from "../../old/position";
 
 interface Head extends HTMLElement { };
 

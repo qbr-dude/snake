@@ -1,35 +1,34 @@
 import { createWatch, isInNotificationPhase } from "./signals";
 
-import { setStep, x, y } from "./position";
-import { scheduleUpdate } from "./tick";
-import { createHead, moveHead } from "./ui/snake/head";
-import { getSnakeSize } from "./ui/utils";
+import { subscribeNotifierForUpdate } from "./tick";
+import { bindDirection } from "./engine/direction";
+
+const main = (root: HTMLElement): void => {
+
+}
 
 document.addEventListener('DOMContentLoaded', () => {
-  const root = document.querySelector<HTMLElement>('#app');
+    const root = document.querySelector<HTMLElement>('#app');
 
-  if (!root) {
-    return;
-  }
+    if (!root) {
+        return;
+    }
 
-  const size = getSnakeSize(root);
-  if (size) {
-    setStep(size);
-  }
+    bindDirection();
 
-  createHead(root, { x: x(), y: y() });
+    const engineWatcher = createWatch(
+        () => {
+            main(root);
+        },
+        (watch) => {
+            if (isInNotificationPhase()) {
+                return;
+            }
 
-  const engineWatcher = createWatch(
-    () => {
-      moveHead({ x: x(), y: y() });
-    },
-    (watch) => {
-      if (!isInNotificationPhase()) {
-        watch.run();
-      }
-    },
-    false,
-  );
+            watch.run();
+        },
+        true,
+    );
 
-  scheduleUpdate(engineWatcher.notify);
+    subscribeNotifierForUpdate(engineWatcher.notify);
 });

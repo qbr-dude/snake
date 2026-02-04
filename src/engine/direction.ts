@@ -1,13 +1,15 @@
-import { createSignal } from "./signals";
+import { createSignal } from "../signals";
 
 /// DIRECTIONS
 
-export const Direction = Object.freeze({
+export const Direction = {
     Up: 'ArrowUp',
     Down: 'ArrowDown',
     Left: 'ArrowLeft',
     Right: 'ArrowRight'
-});
+} as const;
+
+const defaultDirection = Direction.Right;
 
 export type DirectionType = typeof Direction[keyof typeof Direction];
 
@@ -17,12 +19,12 @@ const isArrowKey = (key: string): key is DirectionType =>
 
 /// OPPOSITE DIRECTIONS
 
-const OppositeDirection = Object.freeze({
+const OppositeDirection = {
     [Direction.Up]: Direction.Down,
     [Direction.Down]: Direction.Up,
     [Direction.Left]: Direction.Right,
     [Direction.Right]: Direction.Left,
-} satisfies Readonly<Record<DirectionType, DirectionType>>);
+} as const satisfies Readonly<Record<DirectionType, DirectionType>>;
 
 const isOppositeDirection = (newDirection: DirectionType): boolean =>
     direction() !== newDirection && OppositeDirection[direction()] === newDirection;
@@ -30,13 +32,20 @@ const isOppositeDirection = (newDirection: DirectionType): boolean =>
 
 /// SIGNAL
 
-export const defaultDirection = Direction.Right;
-
 const [direction, setDirection] = createSignal<DirectionType>(defaultDirection);
+
 
 /// LISTENERS
 
-const tryToChangeDirection = (arrow: DirectionType): void => {
+const listenToKeyboardEvent = (keyboardEvent: KeyboardEvent): void => {
+    // Проверяем, что нажатая кнопка является стрелочкой
+    if (!isArrowKey(keyboardEvent.key)) {
+        return;
+    }
+
+    const arrow = keyboardEvent.key;
+
+    // Не даем изменить направление, если оно противоположное
     if (isOppositeDirection(arrow)) {
         return;
     }
@@ -44,9 +53,10 @@ const tryToChangeDirection = (arrow: DirectionType): void => {
     setDirection(arrow);
 }
 
-document.addEventListener(
-    'keydown',
-    e => isArrowKey(e.key) && tryToChangeDirection(e.key)
-);
+/** @todo rename */
+const bindDirection = () => {
+    document.addEventListener('keydown', listenToKeyboardEvent);
+}
 
-export { direction };
+
+export { direction, bindDirection };
