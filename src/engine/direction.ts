@@ -13,8 +13,15 @@ const defaultDirection = Direction.Right;
 
 export type DirectionType = typeof Direction[keyof typeof Direction];
 
-const isArrowKey = (key: string): key is DirectionType =>
-    Object.values(Direction).includes(key as DirectionType);
+type XDirection = typeof Direction.Left | typeof Direction.Right;
+type YDirection = typeof Direction.Up | typeof Direction.Down;
+
+// TODO essential?
+export const isXDirection = (direction: DirectionType): direction is XDirection =>
+    direction === Direction.Left || direction === Direction.Right;
+
+export const isYDirection = (direction: DirectionType): direction is YDirection =>
+    direction === Direction.Up || direction === Direction.Down;
 
 
 /// OPPOSITE DIRECTIONS
@@ -36,6 +43,9 @@ const [direction, setDirection] = createSignal<DirectionType>(defaultDirection);
 
 
 /// LISTENERS
+
+const isArrowKey = (key: string): key is DirectionType =>
+    Object.values(Direction).includes(key as DirectionType);
 
 const listenToKeyboardEvent = (keyboardEvent: KeyboardEvent): void => {
     // Проверяем, что нажатая кнопка является стрелочкой
