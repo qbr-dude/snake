@@ -53,6 +53,25 @@ export const createHead = (position: Position, initialDirection: DirectionType):
     const previousX = getPreviousXLink({ x, direction });
     const previousY = getPreviousYLink({ y, direction });
 
+    const move: Head['move'] = (dir, step = DEFAULT_STEP) => {
+        setDirection(dir);
+
+        switch (dir) {
+            case Direction.Up: {
+                return setY(y() - step);
+            }
+            case Direction.Right: {
+                return setX(x() + step);
+            }
+            case Direction.Down: {
+                return setY(y() + step);
+            }
+            case Direction.Left: {
+                return setX(x() - step);
+            }
+        }
+    };
+
     const head = {
         x,
         y,
@@ -60,36 +79,21 @@ export const createHead = (position: Position, initialDirection: DirectionType):
         previousX,
         previousY,
         next: null,
-        move: (dir, step = DEFAULT_STEP) => {
-            setDirection(dir);
-
-            switch (dir) {
-                case Direction.Up: {
-                    return setY(y() - step);
-                }
-                case Direction.Right: {
-                    return setX(x() + step);
-                }
-                case Direction.Down: {
-                    return setY(y() + step);
-                }
-                case Direction.Left: {
-                    return setX(x() - step);
-                }
-            }
-        },
-        eat: function () {
-            let lastTail = this.next;
-
-            while (lastTail?.next) {
-                lastTail = lastTail.next;
-            }
-
-            if (lastTail) {
-                createTail(lastTail);
-            }
-        }
+        move,
+        eat: () => void 0,
     } satisfies Head;
+
+    head.eat = function () {
+        let lastTail = (this as Head).next;
+
+        while (lastTail?.next) {
+            lastTail = lastTail.next;
+        }
+
+        if (lastTail) {
+            createTail(lastTail);
+        }
+    }
 
     return head;
 }
