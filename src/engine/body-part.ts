@@ -1,43 +1,34 @@
 import { createSignal, createLinkedSignal, untracked, type SignalGetter, type LinkedSignalGetter, } from "../@angular/signals";
 import { DEFAULT_STEP } from "../models/field.interface";
 
-import { type Position } from "../models/position.interface";
+import { type FieldUnit, type FieldUnitPosition } from "../models/field-unit.interface";
 import { DEFAULT_DIRECTION, Direction, isXDirection, isYDirection, type DirectionType } from "./direction";
 
-interface BodyPart {
-    /** Current position */
-    x: SignalGetter<Position['x']>;
-    /** Current position */
-    y: SignalGetter<Position['y']>;
+interface BodyPart extends FieldUnit {
     /** Куда направлено "тело" */
     direction: SignalGetter<DirectionType>;
 
-    previousX: SignalGetter<Position['x'] | null>;
-    previousY: SignalGetter<Position['y'] | null>;
+    previousX: SignalGetter<FieldUnitPosition['x'] | null>;
+    previousY: SignalGetter<FieldUnitPosition['y'] | null>;
 
     /** Следующая часть тела */
     next: BodyPart | null;
 }
-interface LinkedPreviousXSource {
-    x: BodyPart['x'];
-    direction: BodyPart['direction'];
-}
-interface LinkedPreviousYSource {
-    y: BodyPart['y'];
-    direction: BodyPart['direction'];
-}
-interface LinkedX {
-    x: Position['x'] | null;
+interface PreviousXSource {
+    x: FieldUnitPosition['x'];
     direction: DirectionType;
 }
-interface LinkedY {
-    y: Position['y'] | null;
+interface PreviousYSource {
+    y: FieldUnitPosition['y'];
     direction: DirectionType;
 }
+type LinkedPreviousSource<Source> = {
+    [K in keyof Source]: SignalGetter<Source[K]>;
+};
 interface DirectionSource {
     direction: DirectionType;
-    x: Position['x'] | null;
-    y: Position['y'] | null;
+    x: FieldUnitPosition['x'] | null;
+    y: FieldUnitPosition['y'] | null;
 }
 
 export interface Head extends BodyPart {
@@ -49,7 +40,7 @@ export const isHead = (bodyPart: BodyPart): bodyPart is Head => {
     return 'move' in bodyPart && typeof bodyPart.move === 'function';
 }
 
-export const createHead = (position: Position, initialDirection: DirectionType): Head => {
+export const createHead = (position: FieldUnitPosition, initialDirection: DirectionType): Head => {
     const [x, setX] = createSignal(position.x);
     const [y, setY] = createSignal(position.y);
 
@@ -88,15 +79,16 @@ export const createHead = (position: Position, initialDirection: DirectionType):
         eat: () => void 0,
     } satisfies Head;
 
+    // TODO when should i create a new one? After last tail passed "eat" point? 
     head.eat = function () {
-        let lastTail = (this as Head).next;
+        let bodyPart = (this as Head).next;
 
-        while (lastTail?.next) {
-            lastTail = lastTail.next;
+        while (bodyPart?.next) {
+            bodyPart = bodyPart.next;
         }
 
-        if (lastTail) {
-            createTail(lastTail);
+        if (bodyPart) {
+            createTail(bodyPart);
         }
     }
 
@@ -106,7 +98,7 @@ export const createHead = (position: Position, initialDirection: DirectionType):
 export interface Tail extends BodyPart { };
 
 export const createTail = (parent: Head | Tail): Tail => {
-    const x = createLinkedSignal<Position['x'] | null, Position['x']>(
+    const x = createLinkedSignal<FieldUnitPosition['x'] | null, FieldUnitPosition['x']>(
         () => parent.previousX(),
         (source) => {
             const fallback = untracked(() => parent.x()) - (isXDirection(parent.direction()) ? DEFAULT_STEP : 0);
@@ -114,7 +106,7 @@ export const createTail = (parent: Head | Tail): Tail => {
         }
     );
 
-    const y = createLinkedSignal<Position['y'] | null, Position['y']>(
+    const y = createLinkedSignal<FieldUnitPosition['y'] | null, FieldUnitPosition['y']>(
         () => parent.previousY(),
         (source) => {
             const fallback = untracked(() => parent.y() - (isYDirection(parent.direction()) ? DEFAULT_STEP : 0));
@@ -144,8 +136,8 @@ export const createTail = (parent: Head | Tail): Tail => {
  * If the source value is not available (e.g. during the first computation), 
  * it falls back to calculating the previous position based on the current position and direction of movement.
  */
-const getPreviousXLink = ({ x, direction }: LinkedPreviousXSource): LinkedSignalGetter<LinkedX, Position['x'] | null> =>
-    createLinkedSignal<LinkedX, Position['x'] | null>(
+const getPreviousXLink = ({ x, direction }: LinkedPreviousSource<PreviousXSource>): LinkedSignalGetter<PreviousXSource, FieldUnitPosition['x'] | null> =>
+    createLinkedSignal<PreviousXSource, FieldUnitPosition['x'] | null>(
         () => ({ x: x(), direction: direction() }),
         (_source, previous) => previous?.source?.x ?? null
     )
@@ -155,8 +147,8 @@ const getPreviousXLink = ({ x, direction }: LinkedPreviousXSource): LinkedSignal
  * If the source value is not available (e.g. during the first computation), 
  * it falls back to calculating the previous position based on the current position and direction of movement.
  */
-const getPreviousYLink = ({ y, direction }: LinkedPreviousYSource): LinkedSignalGetter<LinkedY, Position['y'] | null> =>
-    createLinkedSignal<LinkedY, Position['y'] | null>(
+const getPreviousYLink = ({ y, direction }: LinkedPreviousSource<PreviousYSource>): LinkedSignalGetter<PreviousYSource, FieldUnitPosition['y'] | null> =>
+    createLinkedSignal<PreviousYSource, FieldUnitPosition['y'] | null>(
         () => ({ y: y(), direction: direction() }),
         (_source, previous) => previous?.source?.y ?? null
     )
