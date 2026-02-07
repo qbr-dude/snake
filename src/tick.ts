@@ -1,4 +1,4 @@
-import { createSignal, type Watch } from "./signals";
+import { createSignal, type Watch } from "./@angular/signals";
 
 const defaultInterval = 1_000;
 

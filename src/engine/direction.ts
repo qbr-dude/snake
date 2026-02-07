@@ -1,4 +1,4 @@
-import { createSignal } from "../signals";
+import { createSignal } from "../@angular/signals";
 
 /// DIRECTIONS
 
@@ -9,7 +9,7 @@ export const Direction = {
     Right: 'ArrowRight'
 } as const;
 
-const defaultDirection = Direction.Right;
+export const DEFAULT_DIRECTION = Direction.Right;
 
 export type DirectionType = typeof Direction[keyof typeof Direction];
 
@@ -39,7 +39,7 @@ const isOppositeDirection = (newDirection: DirectionType): boolean =>
 
 /// SIGNAL
 
-const [direction, setDirection] = createSignal<DirectionType>(defaultDirection);
+const [direction, setDirection] = createSignal<DirectionType>(DEFAULT_DIRECTION);
 
 
 /// LISTENERS
