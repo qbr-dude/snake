@@ -1,6 +1,7 @@
 import { createSignal, createLinkedSignal, untracked, type SignalGetter, type LinkedSignalGetter, } from "../@angular/signals";
+import { DEFAULT_STEP } from "../models/field.interface";
 
-import { DEFAULT_STEP, type Position } from "../models/position.interface";
+import { type Position } from "../models/position.interface";
 import { DEFAULT_DIRECTION, Direction, isXDirection, isYDirection, type DirectionType } from "./direction";
 
 interface BodyPart {
@@ -43,6 +44,10 @@ export interface Head extends BodyPart {
     move: (direction: DirectionType, step?: number) => void;
     eat: () => void;
 };
+
+export const isHead = (bodyPart: BodyPart): bodyPart is Head => {
+    return 'move' in bodyPart && typeof bodyPart.move === 'function';
+}
 
 export const createHead = (position: Position, initialDirection: DirectionType): Head => {
     const [x, setX] = createSignal(position.x);

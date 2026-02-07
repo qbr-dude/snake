@@ -16,7 +16,6 @@ export type DirectionType = typeof Direction[keyof typeof Direction];
 type XDirection = typeof Direction.Left | typeof Direction.Right;
 type YDirection = typeof Direction.Up | typeof Direction.Down;
 
-// TODO essential?
 export const isXDirection = (direction: DirectionType): direction is XDirection =>
     direction === Direction.Left || direction === Direction.Right;
 
