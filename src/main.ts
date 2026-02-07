@@ -3,15 +3,23 @@ import { createWatch, isInNotificationPhase } from "./@angular/signals";
 import { subscribeNotifierForUpdate } from "./tick";
 import { bindDirection, direction } from "./engine/direction";
 import { createHead, createTail, type Head, type Tail } from "./engine/body-part";
+import { createField } from "./engine/field";
 
+const field = createField(20, 20);
 const head = createHead({ x: 0, y: 0 }, direction());
+field.appendBodyPart(head);
+
 let node: Head | Tail = head;
 for (let i = 0; i < 3; i++) {
     node = createTail(node);
+    field.appendBodyPart(node);
 }
+
 
 const main = (root: HTMLElement): void => {
     head.move(direction());
+
+    field.requestUpdate();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -32,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // IMPORTANT
             watch.run();
         },
         true,

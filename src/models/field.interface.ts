@@ -17,6 +17,9 @@ export interface Field {
     contains: (bodyPart: Head | Tail) => boolean;
 
     getRandomEmptyFieldUnit: () => { x: FieldUnitPosition['x']; y: FieldUnitPosition['y'] } | null;
+
+    /** Update Field BitMap */
+    requestUpdate: () => void;
 }
 
 /** Default step inside a field */

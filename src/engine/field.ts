@@ -1,4 +1,4 @@
-import { untracked } from "../@angular/signals";
+import { createWatch, isInNotificationPhase, untracked } from "../@angular/signals";
 
 import type { FieldUnitPosition } from "../models/field-unit.interface";
 import type { Field } from "../models/field.interface";
@@ -12,6 +12,8 @@ import { isHead, type Head, type Tail } from "./body-part";
  */
 export const createField = (width: number, height: number): Field => {
     const bodyParts = new Set<Head | Tail>();
+    let head: Head | null = null;
+    let tail: Tail | null = null;
 
     const bitMap = createBitMap(width, height);
 
@@ -32,9 +34,17 @@ export const createField = (width: number, height: number): Field => {
     };
 
     const appendBodyPart: Field['appendBodyPart'] = (bodyPart) => {
-        if (isHead(bodyPart) && contains(bodyPart)) {
-            console.warn('Head already exists in the field. Cannot append another head.');
+        if (contains(bodyPart)) {
+            console.warn('Attempting to add body part that is already present in the field.');
             return;
+        }
+
+        if (isHead(bodyPart)) {
+            head = bodyPart;
+        }
+
+        if (!bodyPart.next) {
+            tail = bodyPart;
         }
 
         bodyParts.add(bodyPart);
@@ -57,6 +67,33 @@ export const createField = (width: number, height: number): Field => {
         return bitMap.getEmptyPosition();
     };
 
+    const fieldWatcher = createWatch(
+        () => {
+            const headPosition = head ? { x: head.x(), y: head.y() } : null;
+            const tailPosition = tail ? { x: tail.previousX() ?? tail.x(), y: tail.previousY() ?? tail.y() } : null;
+
+            if (headPosition) {
+                bitMap.takePosition(headPosition.x, headPosition.y);
+            }
+
+            if (tailPosition) {
+                bitMap.releasePosition(tailPosition.x, tailPosition.y);
+            }
+        },
+        (watch) => {
+            if (isInNotificationPhase() || !head || !tail) {
+                return;
+            }
+
+            watch.run();
+        },
+        true
+    );
+
+    const requestUpdate: Field['requestUpdate'] = () => {
+        fieldWatcher.notify();
+    };
+
     const field: Field = {
         width,
         height,
@@ -64,7 +101,8 @@ export const createField = (width: number, height: number): Field => {
         appendBodyPart,
         removeBodyPart,
         contains,
-        getRandomEmptyFieldUnit
+        getRandomEmptyFieldUnit,
+        requestUpdate,
     };
 
     return field;
@@ -74,6 +112,7 @@ interface BitMap {
     takePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => void;
     releasePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => void;
     getEmptyPosition: () => { x: FieldUnitPosition['x'], y: FieldUnitPosition['y'] } | null;
+    debug: () => void;
 }
 
 const createBitMap = (width: number, height: number): BitMap => {
@@ -151,5 +190,11 @@ const createBitMap = (width: number, height: number): BitMap => {
         getEmptyPosition,
         takePosition: take,
         releasePosition: release,
+        debug: () => {
+            console.log("BitMap Debug Info:");
+            for (let i = 0; i < rowBitmaps.length; i++) {
+                console.log(`Row ${i}: ${rowBitmaps[i].toString(2).padStart(width, '0')} (free: ${rowFreeCounts[i]})`);
+            }
+        }
     };
 };
