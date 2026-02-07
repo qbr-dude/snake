@@ -1,4 +1,4 @@
-import { createSignal, createLinkedSignal, untracked, type SignalGetter, } from "../@angular/signals";
+import { createSignal, createLinkedSignal, untracked, type SignalGetter, type LinkedSignalGetter, } from "../@angular/signals";
 
 import { DEFAULT_STEP, type Position } from "../models/position.interface";
 import { DEFAULT_DIRECTION, Direction, isXDirection, isYDirection, type DirectionType } from "./direction";
@@ -17,40 +17,48 @@ interface BodyPart {
     /** Следующая часть тела */
     next: BodyPart | null;
 }
+interface LinkedPreviousXSource {
+    x: BodyPart['x'];
+    direction: BodyPart['direction'];
+}
+interface LinkedPreviousYSource {
+    y: BodyPart['y'];
+    direction: BodyPart['direction'];
+}
+interface LinkedX {
+    x: Position['x'] | null;
+    direction: DirectionType;
+}
+interface LinkedY {
+    y: Position['y'] | null;
+    direction: DirectionType;
+}
+interface DirectionSource {
+    direction: DirectionType;
+    x: Position['x'] | null;
+    y: Position['y'] | null;
+}
 
 export interface Head extends BodyPart {
     move: (direction: DirectionType, step?: number) => void;
     eat: () => void;
 };
 
-interface PreviousX {
-    x: Position['x'] | null;
-    direction: DirectionType;
-}
-interface PreviousY {
-    y: Position['y'] | null;
-    direction: DirectionType;
-}
-
 export const createHead = (position: Position, initialDirection: DirectionType): Head => {
     const [x, setX] = createSignal(position.x);
     const [y, setY] = createSignal(position.y);
+
     const [direction, setDirection] = createSignal(initialDirection ?? DEFAULT_DIRECTION);
 
-    const previousX = createLinkedSignal<PreviousX, Position['x'] | null>(
-        () => ({ x: x(), direction: direction() }),
-        (_source, previous) => previous?.source?.x ?? null
-    );
-    const previousY = createLinkedSignal<PreviousY, Position['y'] | null>(
-        () => ({ y: y(), direction: direction() }),
-        (_source, previous) => previous?.source?.y ?? null
-    );
+    const previousX = getPreviousXLink({ x, direction });
+    const previousY = getPreviousYLink({ y, direction });
 
     const head = {
         x,
         y,
         direction,
-        previousX, previousY,
+        previousX,
+        previousY,
         next: null,
         move: (dir, step = DEFAULT_STEP) => {
             setDirection(dir);
@@ -92,7 +100,7 @@ export const createTail = (parent: Head | Tail): Tail => {
     const x = createLinkedSignal<Position['x'] | null, Position['x']>(
         () => parent.previousX(),
         (source) => {
-            const fallback = (untracked(() => parent.x()) - (untracked(() => isXDirection(parent.direction())) ? DEFAULT_STEP : 0));
+            const fallback = untracked(() => parent.x()) - (isXDirection(parent.direction()) ? DEFAULT_STEP : 0);
             return source ?? fallback;
         }
     );
@@ -100,27 +108,46 @@ export const createTail = (parent: Head | Tail): Tail => {
     const y = createLinkedSignal<Position['y'] | null, Position['y']>(
         () => parent.previousY(),
         (source) => {
-            const fallback = untracked(() => parent.y()) - (untracked(() => isYDirection(parent.direction())) ? DEFAULT_STEP : 0);
+            const fallback = untracked(() => parent.y() - (isYDirection(parent.direction()) ? DEFAULT_STEP : 0));
             return source ?? fallback;
         }
     );
 
-    interface DirectionSource {
-        direction: DirectionType;
-        x: Position['x'] | null;
-        y: Position['y'] | null;
-    }
+    // back ref logic (compare to head direction)
     const direction = createLinkedSignal<DirectionSource, DirectionType>(
         () => ({ direction: parent.direction(), x: x(), y: y() }),
         ({ direction }, previous) => previous?.source.direction ?? direction
     );
 
-    const previousX = createLinkedSignal<PreviousX, Position['x'] | null>(() => ({ x: x(), direction: direction() }), (_source, previous) => previous?.source?.x ?? null);
-    const previousY = createLinkedSignal<PreviousY, Position['y'] | null>(() => ({ y: y(), direction: direction() }), (_source, previous) => previous?.source?.y ?? null);
+    const previousX = getPreviousXLink({ x, direction });
+    const previousY = getPreviousYLink({ y, direction });
 
     const tail = { x, y, direction, next: null, previousX, previousY } as Tail;
 
+    // link with parent
     parent.next = tail;
 
     return tail;
 }
+
+/**
+ * Links for previousX of body parts, based on the position and direction of the parent part. 
+ * If the source value is not available (e.g. during the first computation), 
+ * it falls back to calculating the previous position based on the current position and direction of movement.
+ */
+const getPreviousXLink = ({ x, direction }: LinkedPreviousXSource): LinkedSignalGetter<LinkedX, Position['x'] | null> =>
+    createLinkedSignal<LinkedX, Position['x'] | null>(
+        () => ({ x: x(), direction: direction() }),
+        (_source, previous) => previous?.source?.x ?? null
+    )
+
+/**
+ * Links for previousY of body parts, based on the position and direction of the parent part. 
+ * If the source value is not available (e.g. during the first computation), 
+ * it falls back to calculating the previous position based on the current position and direction of movement.
+ */
+const getPreviousYLink = ({ y, direction }: LinkedPreviousYSource): LinkedSignalGetter<LinkedY, Position['y'] | null> =>
+    createLinkedSignal<LinkedY, Position['y'] | null>(
+        () => ({ y: y(), direction: direction() }),
+        (_source, previous) => previous?.source?.y ?? null
+    )
