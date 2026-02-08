@@ -5,18 +5,22 @@ import type { Field } from "../models/field.interface";
 import { isHead, type Head, type Tail } from "./body-part";
 import { type Food } from "./food";
 
+type PositionKey = `${FieldUnitPosition['x']}::${FieldUnitPosition['y']}`;
+
 /**
  * @param width - number of FieldUnits in x direction (not px)
  * @param height - number of FieldUnits in y direction (not px)
  */
 export const createField = (width: number, height: number): Field => {
     const bodyParts = new Set<Head | Tail>();
-    const foodUnits = new Set<Food>();
+    const foodUnits = new Map<PositionKey, Food>();
 
     let head: Head | null = null;
     let tail: Tail | null = null;
 
     const bitMap = createBitMap(width, height);
+    const foodMap = createBitMap(width, height);
+
     const fieldWatcher = createWatch(
         () => {
             if (head) {
@@ -85,22 +89,45 @@ export const createField = (width: number, height: number): Field => {
 
     // Еда добавляется через getRandomEmptyFieldUnit, но после она все равно падает
     const dropFood: Field['dropFood'] = (food) => {
-        if (foodUnits.has(food)) {
+        let foodKey = `${food.x()}::${food.y()}` as PositionKey;
+
+        if (foodUnits.get(foodKey) === food) {
             console.warn('Attempting to drop food that is already present on the field.');
             return;
         }
 
-        if (!bitMap.takePosition(food.x(), food.y())) {
+        if (bitMap.isPositionTaken(food.x(), food.y())) {
             // Try to find a new position
-            const newPos = bitMap.getEmptyPosition();
+            let newPos = bitMap.getEmptyPosition();
+            // If not found in 5 attempts, consider a bird took the food and do not place it on the field
+            let attemptsToFindNewPos = 5;
+
+            while (
+                newPos &&
+                bitMap.isPositionTaken(newPos.x, newPos.y) &&
+                attemptsToFindNewPos > 0
+            ) {
+                newPos = bitMap.getEmptyPosition();
+                attemptsToFindNewPos--;
+            }
+
             if (newPos) {
                 food.roll(newPos.x - food.x(), newPos.y - food.y());
+                foodKey = `${food.x()}::${food.y()}` as PositionKey;
             } else {
-                console.warn('Failed to find an empty position for food.');
+                console.warn('Bird took the food before it could be placed on the field.');
                 return;
             }
         }
-        foodUnits.add(food);
+
+        if (foodMap.isPositionTaken(food.x(), food.y())) {
+            console.log('Attempting to drop food at a position that is already occupied by another food. Releasing the old food.');
+            foodMap.releasePosition(food.x(), food.y());
+        }
+
+        foodMap.takePosition(food.x(), food.y());
+        bitMap.takePosition(food.x(), food.y());
+        foodUnits.set(foodKey, food);
     };
 
     const removeBodyPart: Field['removeBodyPart'] = (bodyPart) => {
@@ -126,16 +153,20 @@ export const createField = (width: number, height: number): Field => {
             return false;
         }
 
-        // TODO optimize search
-        for (const food of foodUnits) {
-            if (headPosition.x === food.x() && headPosition.y === food.y()) {
-                foodUnits.delete(food);
-                bitMap.releasePosition(food.x(), food.y());
-                return true;
-            }
+        const { x, y } = headPosition;
+
+        if (!foodMap.isPositionTaken(x, y)) {
+            return false;
         }
 
-        return false;
+        const foodPosition = `${x}::${y}` as PositionKey;
+
+        foodUnits.delete(foodPosition);
+
+        bitMap.releasePosition(x, y);
+        foodMap.releasePosition(x, y);
+
+        return true;
     };
 
     const field: Field = {
@@ -158,6 +189,7 @@ interface BitMap {
     takePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     releasePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     getEmptyPosition: () => { x: FieldUnitPosition['x'], y: FieldUnitPosition['y'] } | null;
+    isPositionTaken: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     debug: () => void;
 }
 
@@ -236,10 +268,15 @@ const createBitMap = (width: number, height: number): BitMap => {
         return null;
     };
 
+    const isPositionTaken: BitMap['isPositionTaken'] = (x, y) => {
+        return isBitSet(rowBitmaps[y], x);
+    };
+
     return {
         getEmptyPosition,
         takePosition: take,
         releasePosition: release,
+        isPositionTaken,
         debug: () => {
             console.log("BitMap Debug Info:");
             for (let i = 0; i < rowBitmaps.length; i++) {
