@@ -4,6 +4,7 @@ import { subscribeNotifierForUpdate } from "./tick";
 import { bindDirection, direction } from "./engine/direction";
 import { createHead, createTail, type Head, type Tail } from "./engine/body-part";
 import { createField } from "./engine/field";
+import { createFood } from "./engine/food";
 
 const field = createField(20, 20);
 const head = createHead({ x: 0, y: 0 }, direction());
@@ -14,6 +15,8 @@ for (let i = 0; i < 3; i++) {
     node = createTail(node);
     field.appendBodyPart(node);
 }
+
+field.dropFood(createFood({ x: 5, y: 5 }));
 
 
 const main = (root: HTMLElement): void => {
@@ -61,5 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
 //         node = node.next;
 //         count++;
 //     }
+//     console.log(`Food position: x: [${food.x()}], y: [${food.y()}]`);
 //     console.log('-----------------');
 // })

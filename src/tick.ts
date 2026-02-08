@@ -1,6 +1,6 @@
 import { createSignal, type Watch } from "./@angular/signals";
 
-const defaultInterval = 5_000;
+const defaultInterval = 2_000;
 
 // Notifier, который будет уведомляться, что произошел тик
 let notifier: Watch['notify'] | undefined = undefined;

@@ -1,4 +1,5 @@
 import type { Head, Tail } from "../engine/body-part";
+import type { Food } from "../engine/food";
 import type { FieldUnitPosition } from "./field-unit.interface";
 
 export interface Field {
@@ -20,6 +21,9 @@ export interface Field {
 
     /** Update Field BitMap */
     requestUpdate: () => void;
+
+    /** Drop food on the field at the specified position */
+    dropFood: (food: Food) => void;
 }
 
 /** Default step inside a field */

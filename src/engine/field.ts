@@ -3,19 +3,48 @@ import { createWatch, isInNotificationPhase, untracked } from "../@angular/signa
 import type { FieldUnitPosition } from "../models/field-unit.interface";
 import type { Field } from "../models/field.interface";
 import { isHead, type Head, type Tail } from "./body-part";
+import { type Food } from "./food";
 
 /**
  * @param width - number of FieldUnits in x direction (not px)
  * @param height - number of FieldUnits in y direction (not px)
- * 
- * @todo add uiScale to FieldUnit and use it in rendering instead of global UI_STEP_COEFFICIENT?
  */
 export const createField = (width: number, height: number): Field => {
     const bodyParts = new Set<Head | Tail>();
+    const foodUnits = new Set<Food>();
+
     let head: Head | null = null;
     let tail: Tail | null = null;
 
     const bitMap = createBitMap(width, height);
+    const fieldWatcher = createWatch(
+        () => {
+            if (head) {
+                const headPosition = { x: head.x(), y: head.y() };
+
+                if (headEatsFood(headPosition)) {
+                    head?.eat();
+                    // TODO how to add new food
+                }
+
+                bitMap.takePosition(headPosition.x, headPosition.y);
+            }
+
+            if (tail) {
+                const tailPosition = { x: tail.x(), y: tail.y() };
+
+                bitMap.releasePosition(tailPosition.x, tailPosition.y);
+            }
+        },
+        (watch) => {
+            if (isInNotificationPhase() || !head || !tail) {
+                return;
+            }
+
+            watch.run();
+        },
+        true
+    );
 
     const contains: Field['contains'] = (bodyPart) => bodyParts.has(bodyPart);
 
@@ -47,9 +76,31 @@ export const createField = (width: number, height: number): Field => {
             tail = bodyPart;
         }
 
+        if (!bitMap.takePosition(bodyPart.x(), bodyPart.y())) {
+            console.warn('Attempting to add body part at a position that is already occupied. This may lead to inconsistencies.');
+            return;
+        }
         bodyParts.add(bodyPart);
+    };
 
-        untracked(() => bitMap.takePosition(bodyPart.x(), bodyPart.y()));
+    // Еда добавляется через getRandomEmptyFieldUnit, но после она все равно падает
+    const dropFood: Field['dropFood'] = (food) => {
+        if (foodUnits.has(food)) {
+            console.warn('Attempting to drop food that is already present on the field.');
+            return;
+        }
+
+        if (!bitMap.takePosition(food.x(), food.y())) {
+            // Try to find a new position
+            const newPos = bitMap.getEmptyPosition();
+            if (newPos) {
+                food.roll(newPos.x - food.x(), newPos.y - food.y());
+            } else {
+                console.warn('Failed to find an empty position for food.');
+                return;
+            }
+        }
+        foodUnits.add(food);
     };
 
     const removeBodyPart: Field['removeBodyPart'] = (bodyPart) => {
@@ -59,39 +110,32 @@ export const createField = (width: number, height: number): Field => {
         }
 
         bodyParts.delete(bodyPart);
-
-        untracked(() => bitMap.releasePosition(bodyPart.x(), bodyPart.y()));
+        bitMap.releasePosition(bodyPart.x(), bodyPart.y());
     };
 
     const getRandomEmptyFieldUnit: Field['getRandomEmptyFieldUnit'] = () => {
         return bitMap.getEmptyPosition();
     };
 
-    const fieldWatcher = createWatch(
-        () => {
-            const headPosition = head ? { x: head.x(), y: head.y() } : null;
-            const tailPosition = tail ? { x: tail.previousX() ?? tail.x(), y: tail.previousY() ?? tail.y() } : null;
-
-            if (headPosition) {
-                bitMap.takePosition(headPosition.x, headPosition.y);
-            }
-
-            if (tailPosition) {
-                bitMap.releasePosition(tailPosition.x, tailPosition.y);
-            }
-        },
-        (watch) => {
-            if (isInNotificationPhase() || !head || !tail) {
-                return;
-            }
-
-            watch.run();
-        },
-        true
-    );
-
     const requestUpdate: Field['requestUpdate'] = () => {
         fieldWatcher.notify();
+    };
+
+    const headEatsFood = (headPosition: FieldUnitPosition) => {
+        if (!head) {
+            return false;
+        }
+
+        // TODO optimize search
+        for (const food of foodUnits) {
+            if (headPosition.x === food.x() && headPosition.y === food.y()) {
+                foodUnits.delete(food);
+                bitMap.releasePosition(food.x(), food.y());
+                return true;
+            }
+        }
+
+        return false;
     };
 
     const field: Field = {
@@ -103,14 +147,16 @@ export const createField = (width: number, height: number): Field => {
         contains,
         getRandomEmptyFieldUnit,
         requestUpdate,
+        dropFood,
     };
 
     return field;
 }
 
+// TODO maybe make all as Promise
 interface BitMap {
-    takePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => void;
-    releasePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => void;
+    takePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
+    releasePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     getEmptyPosition: () => { x: FieldUnitPosition['x'], y: FieldUnitPosition['y'] } | null;
     debug: () => void;
 }
@@ -131,23 +177,27 @@ const createBitMap = (width: number, height: number): BitMap => {
     const take: BitMap['takePosition'] = (x, y) => {
         if (isBitSet(rowBitmaps[y], x)) {
             console.warn(`Position (${x}, ${y}) is already taken.`);
-            return;
+            return false;
         }
 
         rowBitmaps[y] = setBit(rowBitmaps[y], x);
         rowFreeCounts[y]--;
         totalFree--;
+
+        return true;
     };
 
     const release: BitMap['releasePosition'] = (x, y) => {
         if (!isBitSet(rowBitmaps[y], x)) {
             console.warn(`Position (${x}, ${y}) is not taken.`);
-            return;
+            return false;
         }
 
         rowBitmaps[y] = clearBit(rowBitmaps[y], x);
         rowFreeCounts[y]++;
         totalFree++;
+
+        return true;
     };
 
     const getEmptyPosition: BitMap['getEmptyPosition'] = () => {
