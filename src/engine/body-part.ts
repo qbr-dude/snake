@@ -33,7 +33,7 @@ interface DirectionSource {
 
 export interface Head extends BodyPart {
     move: (direction: DirectionType, step?: number) => void;
-    eat: () => void;
+    eat: () => Tail | null;
 };
 
 export const isHead = (bodyPart: BodyPart): bodyPart is Head => {
@@ -76,45 +76,65 @@ export const createHead = (position: FieldUnitPosition, initialDirection: Direct
         previousY,
         next: null,
         move,
-        eat: () => void 0,
+        eat: function () {
+            // TODO: to check out why only at the end: 
+            // В модели Angular signals топология графа зависимостей неизменяема после построения.
+            // Следовательно, динамическое переподключение producer’ов невозможно by design.
+
+            // instant appearance (after eat just right at the end of snake)
+            let bodyPart = (this as Head).next;
+            while (bodyPart?.next) {
+                bodyPart = bodyPart.next;
+            }
+
+            if (!bodyPart) {
+                return null
+            }
+
+            return createTail(bodyPart);
+        },
     } satisfies Head;
-
-    // TODO when should i create a new one? After last tail passed "eat" point? 
-    head.eat = function () {
-        let bodyPart = (this as Head).next;
-
-        while (bodyPart?.next) {
-            bodyPart = bodyPart.next;
-        }
-
-        if (bodyPart) {
-            createTail(bodyPart);
-        }
-    }
 
     return head;
 }
 
 export interface Tail extends BodyPart { };
 
-export const createTail = (parent: Head | Tail): Tail => {
+/**
+ * 
+ * @param parent 
+ * @param positionFix - функция корректировки позиции, если родительская за пределами
+ * @returns 
+ */
+export const createTail = (parent: Head | Tail, positionAdjust?: (parent: Head | Tail) => FieldUnitPosition | null): Tail => {
     const x = createLinkedSignal<FieldUnitPosition['x'] | null, FieldUnitPosition['x']>(
         () => parent.previousX(),
-        (source) => {
+        // TODO нужно пофиксить логику positionAdjust + parent last poisition (getPreviousXLink )
+        (previousX) => {
+            if (previousX !== null) {
+                return previousX;
+            }
+            const adjustedPosition = positionAdjust?.(parent) ?? null;
+            // На всякий случай
             const fallback = untracked(() => parent.x()) - (isXDirection(parent.direction()) ? DEFAULT_STEP : 0);
-            return source ?? fallback;
+            return adjustedPosition?.x ?? fallback;
         }
     );
 
     const y = createLinkedSignal<FieldUnitPosition['y'] | null, FieldUnitPosition['y']>(
         () => parent.previousY(),
-        (source) => {
+        (previousY) => {
+            if (previousY !== null) {
+                return previousY;
+            }
+            const adjustedPosition = positionAdjust?.(parent) ?? null;
+            // На всякий случай
             const fallback = untracked(() => parent.y() - (isYDirection(parent.direction()) ? DEFAULT_STEP : 0));
-            return source ?? fallback;
+            return adjustedPosition?.y ?? fallback;
         }
     );
 
-    // back ref logic (compare to head direction)
+    // back ref logic (compare to head previous change)
     const direction = createLinkedSignal<DirectionSource, DirectionType>(
         () => ({ direction: parent.direction(), x: x(), y: y() }),
         ({ direction }, previous) => previous?.source.direction ?? direction
@@ -136,19 +156,51 @@ export const createTail = (parent: Head | Tail): Tail => {
  * If the source value is not available (e.g. during the first computation), 
  * it falls back to calculating the previous position based on the current position and direction of movement.
  */
-const getPreviousXLink = ({ x, direction }: LinkedPreviousSource<PreviousXSource>): LinkedSignalGetter<PreviousXSource, FieldUnitPosition['x'] | null> =>
-    createLinkedSignal<PreviousXSource, FieldUnitPosition['x'] | null>(
+const getPreviousXLink = ({ x, direction }: LinkedPreviousSource<PreviousXSource>): LinkedSignalGetter<PreviousXSource, FieldUnitPosition['x'] | null> => {
+    /** позволяет избежать инитного значения */
+    let firstRun = true;
+    // TODO не коррекнтнео. ПЕРЕДЕЛВАТЬ!!!
+    return createLinkedSignal<PreviousXSource, FieldUnitPosition['x'] | null>(
         () => ({ x: x(), direction: direction() }),
-        (_source, previous) => previous?.source?.x ?? null
-    )
+        (source, previous) => {
+            const last = previous?.source?.x;
+            if (last) {
+                return last;
+            }
+
+            if (firstRun) {
+                firstRun = false;
+                return null;
+            }
+
+            return source.x;
+        }
+    );
+}
 
 /**
  * Links for previousY of body parts, based on the position and direction of the parent part. 
  * If the source value is not available (e.g. during the first computation), 
  * it falls back to calculating the previous position based on the current position and direction of movement.
  */
-const getPreviousYLink = ({ y, direction }: LinkedPreviousSource<PreviousYSource>): LinkedSignalGetter<PreviousYSource, FieldUnitPosition['y'] | null> =>
-    createLinkedSignal<PreviousYSource, FieldUnitPosition['y'] | null>(
+const getPreviousYLink = ({ y, direction }: LinkedPreviousSource<PreviousYSource>): LinkedSignalGetter<PreviousYSource, FieldUnitPosition['y'] | null> => {
+    /** позволяет избежать инитного значения */
+    let firstRun = true;
+    return createLinkedSignal<PreviousYSource, FieldUnitPosition['y'] | null>(
         () => ({ y: y(), direction: direction() }),
-        (_source, previous) => previous?.source?.y ?? null
-    )
+        (source, previous) => {
+            const last = previous?.source?.y;
+            if (last) {
+                return last;
+            }
+
+            if (firstRun) {
+                firstRun = false;
+                return null;
+            }
+
+            return source.y;
+        }
+    );
+}
+

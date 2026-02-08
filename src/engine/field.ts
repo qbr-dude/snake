@@ -1,8 +1,9 @@
-import { createWatch, isInNotificationPhase, untracked } from "../@angular/signals";
+import { createSignal, createWatch, isInNotificationPhase } from "../@angular/signals";
 
 import type { FieldUnitPosition } from "../models/field-unit.interface";
-import type { Field } from "../models/field.interface";
+import { DEFAULT_STEP, IntersectionType, type Field, type HeadIntersection, type HeadToBodyIntersection, type HeadToFoodIntersection } from "../models/field.interface";
 import { isHead, type Head, type Tail } from "./body-part";
+import { Direction, getOppositeDirection, getSideDirections, type DirectionType } from "./direction";
 import { type Food } from "./food";
 
 type PositionKey = `${FieldUnitPosition['x']}::${FieldUnitPosition['y']}`;
@@ -12,7 +13,7 @@ type PositionKey = `${FieldUnitPosition['x']}::${FieldUnitPosition['y']}`;
  * @param height - number of FieldUnits in y direction (not px)
  */
 export const createField = (width: number, height: number): Field => {
-    const bodyParts = new Set<Head | Tail>();
+    const bodyParts = new Map<PositionKey, Head | Tail>();
     const foodUnits = new Map<PositionKey, Food>();
 
     let head: Head | null = null;
@@ -21,23 +22,21 @@ export const createField = (width: number, height: number): Field => {
     const bitMap = createBitMap(width, height);
     const foodMap = createBitMap(width, height);
 
+    const [intersection, setIntersection] = createSignal<HeadToBodyIntersection | HeadToFoodIntersection | null>(null);
+
     const fieldWatcher = createWatch(
         () => {
             if (head) {
                 const headPosition = { x: head.x(), y: head.y() };
 
-                if (headEatsFood(headPosition)) {
-                    head?.eat();
-                    // TODO how to add new food
-                }
+                const intersectionResult = headIntersectsObject(headPosition);
 
-                bitMap.takePosition(headPosition.x, headPosition.y);
+                setIntersection(intersectionResult);
             }
 
             if (tail) {
-                const tailPosition = { x: tail.x(), y: tail.y() };
-
-                bitMap.releasePosition(tailPosition.x, tailPosition.y);
+                // const tailPosition = { x: tail.previousX() ?? tail.x(), y: tail.previousY() ?? tail.y() };
+                // bitMap.releasePosition(tailPosition.x, tailPosition.y);
             }
         },
         (watch) => {
@@ -50,21 +49,14 @@ export const createField = (width: number, height: number): Field => {
         true
     );
 
-    const contains: Field['contains'] = (bodyPart) => bodyParts.has(bodyPart);
+    const contains: Field['contains'] = (bodyPart) => bodyParts.has(bodyPart.x() + "::" + bodyPart.y() as PositionKey);
 
-    const checkBoundaries: Field['checkBoundaries'] = (bodyPart) => {
-        if (!contains(bodyPart)) {
-            console.warn('Body part is not present in the field. Boundary check may be inaccurate.');
-            return false;
-        }
-
-        return untracked(() =>
-            bodyPart.x() >= 0 &&
-            bodyPart.x() < width &&
-            bodyPart.y() >= 0 &&
-            bodyPart.y() < height
-        );
-    };
+    const checkBoundaries = (position: FieldUnitPosition): boolean => (
+        position.x >= 0 &&
+        position.x < width &&
+        position.y >= 0 &&
+        position.y < height
+    );
 
     const appendBodyPart: Field['appendBodyPart'] = (bodyPart) => {
         if (contains(bodyPart)) {
@@ -84,19 +76,20 @@ export const createField = (width: number, height: number): Field => {
             console.warn('Attempting to add body part at a position that is already occupied. This may lead to inconsistencies.');
             return;
         }
-        bodyParts.add(bodyPart);
+        bodyParts.set(bodyPart.x() + "::" + bodyPart.y() as PositionKey, bodyPart);
     };
 
-    // Еда добавляется через getRandomEmptyFieldUnit, но после она все равно падает
     const dropFood: Field['dropFood'] = (food) => {
-        let foodKey = `${food.x()}::${food.y()}` as PositionKey;
+        const [x, y] = [food.x(), food.y()];
+
+        let foodKey = `${x}::${y}` as PositionKey;
 
         if (foodUnits.get(foodKey) === food) {
             console.warn('Attempting to drop food that is already present on the field.');
             return;
         }
 
-        if (bitMap.isPositionTaken(food.x(), food.y())) {
+        if (bitMap.isPositionTaken(x, y)) {
             // Try to find a new position
             let newPos = bitMap.getEmptyPosition();
             // If not found in 5 attempts, consider a bird took the food and do not place it on the field
@@ -112,21 +105,21 @@ export const createField = (width: number, height: number): Field => {
             }
 
             if (newPos) {
-                food.roll(newPos.x - food.x(), newPos.y - food.y());
-                foodKey = `${food.x()}::${food.y()}` as PositionKey;
+                food.roll(newPos.x - x, newPos.y - y);
+                foodKey = `${x}::${y}` as PositionKey;
             } else {
                 console.warn('Bird took the food before it could be placed on the field.');
                 return;
             }
         }
 
-        if (foodMap.isPositionTaken(food.x(), food.y())) {
+        if (foodMap.isPositionTaken(x, y)) {
             console.log('Attempting to drop food at a position that is already occupied by another food. Releasing the old food.');
-            foodMap.releasePosition(food.x(), food.y());
+            foodMap.releasePosition(x, y);
         }
 
-        foodMap.takePosition(food.x(), food.y());
-        bitMap.takePosition(food.x(), food.y());
+        foodMap.takePosition(x, y);
+        bitMap.takePosition(x, y);
         foodUnits.set(foodKey, food);
     };
 
@@ -136,7 +129,7 @@ export const createField = (width: number, height: number): Field => {
             return
         }
 
-        bodyParts.delete(bodyPart);
+        bodyParts.delete(bodyPart.x() + "::" + bodyPart.y() as PositionKey);
         bitMap.releasePosition(bodyPart.x(), bodyPart.y());
     };
 
@@ -144,41 +137,86 @@ export const createField = (width: number, height: number): Field => {
         return bitMap.getEmptyPosition();
     };
 
+    /**
+     * @returns позицию для роста в противоположном или боковых направлениях от `bodyPart.direction()`
+     */
+    const findGrowthCell: Field['findGrowthCell'] = (bodyPart) => {
+        console.log(bodyPart);
+
+        if (!contains(bodyPart)) {
+            console.log('BodyPart is not a part of this field');
+            return null;
+        }
+
+        const direction = bodyPart.direction();
+        const [x, y] = [bodyPart.x(), bodyPart.y()];
+
+        const positions = {
+            [Direction.Up]: { x, y: y - DEFAULT_STEP },
+            [Direction.Right]: { x: x + DEFAULT_STEP, y },
+            [Direction.Down]: { x, y: y + DEFAULT_STEP },
+            [Direction.Left]: { x: x - DEFAULT_STEP, y },
+        } satisfies Record<DirectionType, FieldUnitPosition | null>;
+
+        const candidates = [
+            positions[getOppositeDirection(direction)],
+            ...getSideDirections(direction).map(dir => positions[dir]),
+        ] satisfies FieldUnitPosition[];
+
+        for (const candidate of candidates) {
+            if (!checkBoundaries(candidate)) {
+                continue;
+            }
+
+            if (!bitMap.isPositionTaken(candidate.x, candidate.y)) {
+                return candidate;
+            }
+        }
+
+        return null
+    }
+
     const requestUpdate: Field['requestUpdate'] = () => {
         fieldWatcher.notify();
     };
 
-    const headEatsFood = (headPosition: FieldUnitPosition) => {
-        if (!head) {
-            return false;
+    const headIntersectsObject = (headPosition: FieldUnitPosition): HeadIntersection | null => {
+        if (!head || !bitMap.isPositionTaken(headPosition.x, headPosition.y)) {
+            return null;
         }
 
-        const { x, y } = headPosition;
+        const positionKey = `${headPosition.x}::${headPosition.y}` as PositionKey;
 
-        if (!foodMap.isPositionTaken(x, y)) {
-            return false;
+        if (foodMap.isPositionTaken(headPosition.x, headPosition.y)) {
+            const food = foodUnits.get(positionKey);
+
+            return food ? {
+                type: IntersectionType.HeadToFood,
+                head,
+                food,
+            } : null;
         }
 
-        const foodPosition = `${x}::${y}` as PositionKey;
+        const bodyPart = bodyParts.get(positionKey);
 
-        foodUnits.delete(foodPosition);
-
-        bitMap.releasePosition(x, y);
-        foodMap.releasePosition(x, y);
-
-        return true;
+        return bodyPart ? {
+            type: IntersectionType.HeadToBody,
+            head,
+            bodyPart,
+        } : null;
     };
 
     const field: Field = {
         width,
         height,
-        checkBoundaries,
         appendBodyPart,
         removeBodyPart,
         contains,
         getRandomEmptyFieldUnit,
+        findGrowthCell: findGrowthCell,
         requestUpdate,
         dropFood,
+        intersection,
     };
 
     return field;
@@ -188,7 +226,7 @@ export const createField = (width: number, height: number): Field => {
 interface BitMap {
     takePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     releasePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
-    getEmptyPosition: () => { x: FieldUnitPosition['x'], y: FieldUnitPosition['y'] } | null;
+    getEmptyPosition: () => FieldUnitPosition | null;
     isPositionTaken: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     debug: () => void;
 }

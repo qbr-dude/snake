@@ -22,7 +22,6 @@ export const isXDirection = (direction: DirectionType): direction is XDirection 
 export const isYDirection = (direction: DirectionType): direction is YDirection =>
     direction === Direction.Up || direction === Direction.Down;
 
-
 /// OPPOSITE DIRECTIONS
 
 const OppositeDirection = {
@@ -35,6 +34,24 @@ const OppositeDirection = {
 const isOppositeDirection = (newDirection: DirectionType): boolean =>
     direction() !== newDirection && OppositeDirection[direction()] === newDirection;
 
+export const getOppositeDirection = (direction: DirectionType): DirectionType => OppositeDirection[direction];
+export const getSideDirections = (direction: DirectionType): DirectionType[] => {
+    switch (direction) {
+        case Direction.Up:
+        case Direction.Down: {
+            return [Direction.Left, Direction.Right];
+        }
+
+        case Direction.Left:
+        case Direction.Right: {
+            return [Direction.Up, Direction.Down];
+        }
+
+        default: {
+            return [];
+        }
+    }
+}
 
 /// SIGNAL
 
