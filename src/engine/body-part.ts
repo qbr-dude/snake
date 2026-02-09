@@ -14,17 +14,10 @@ interface BodyPart extends FieldUnit {
     /** Следующая часть тела */
     next: BodyPart | null;
 }
-interface PreviousXSource {
-    x: FieldUnitPosition['x'];
-    direction: DirectionType;
+interface PreviousSource {
+    previousX: FieldUnitPosition['x'];
+    previousY: FieldUnitPosition['y'];
 }
-interface PreviousYSource {
-    y: FieldUnitPosition['y'];
-    direction: DirectionType;
-}
-type LinkedPreviousSource<Source> = {
-    [K in keyof Source]: SignalGetter<Source[K]>;
-};
 interface DirectionSource {
     direction: DirectionType;
     x: FieldUnitPosition['x'] | null;
@@ -46,8 +39,8 @@ export const createHead = (position: FieldUnitPosition, initialDirection: Direct
 
     const [direction, setDirection] = createSignal(initialDirection ?? DEFAULT_DIRECTION);
 
-    const previousX = getPreviousXLink({ x, direction });
-    const previousY = getPreviousYLink({ y, direction });
+    const previousX = getPreviousXLink(x, y);
+    const previousY = getPreviousYLink(x, y);
 
     const move: Head['move'] = (dir, step = DEFAULT_STEP) => {
         setDirection(dir);
@@ -107,17 +100,18 @@ export interface Tail extends BodyPart { };
  * @returns 
  */
 export const createTail = (parent: Head | Tail, positionAdjust?: (parent: Head | Tail) => FieldUnitPosition | null): Tail => {
+    const { x: adjustedX, y: adjustedY } = positionAdjust?.(parent) ?? {};
+
     const x = createLinkedSignal<FieldUnitPosition['x'] | null, FieldUnitPosition['x']>(
         () => parent.previousX(),
-        // TODO нужно пофиксить логику positionAdjust + parent last poisition (getPreviousXLink )
+        // TODO нужно пофиксить логику positionAdjust + parent last position (getPreviousXLink )
         (previousX) => {
             if (previousX !== null) {
                 return previousX;
             }
-            const adjustedPosition = positionAdjust?.(parent) ?? null;
             // На всякий случай
             const fallback = untracked(() => parent.x()) - (isXDirection(parent.direction()) ? DEFAULT_STEP : 0);
-            return adjustedPosition?.x ?? fallback;
+            return adjustedX ?? fallback;
         }
     );
 
@@ -127,10 +121,9 @@ export const createTail = (parent: Head | Tail, positionAdjust?: (parent: Head |
             if (previousY !== null) {
                 return previousY;
             }
-            const adjustedPosition = positionAdjust?.(parent) ?? null;
             // На всякий случай
             const fallback = untracked(() => parent.y() - (isYDirection(parent.direction()) ? DEFAULT_STEP : 0));
-            return adjustedPosition?.y ?? fallback;
+            return adjustedY ?? fallback;
         }
     );
 
@@ -140,8 +133,8 @@ export const createTail = (parent: Head | Tail, positionAdjust?: (parent: Head |
         ({ direction }, previous) => previous?.source.direction ?? direction
     );
 
-    const previousX = getPreviousXLink({ x, direction });
-    const previousY = getPreviousYLink({ y, direction });
+    const previousX = getPreviousXLink(x, y);
+    const previousY = getPreviousYLink(x, y);
 
     const tail = { x, y, direction, next: null, previousX, previousY } as Tail;
 
@@ -152,54 +145,41 @@ export const createTail = (parent: Head | Tail, positionAdjust?: (parent: Head |
 }
 
 /**
- * Links for previousX of body parts, based on the position and direction of the parent part. 
- * If the source value is not available (e.g. during the first computation), 
- * it falls back to calculating the previous position based on the current position and direction of movement.
+ * Links for previousX of body parts, based on the position of the parent part. 
  */
-const getPreviousXLink = ({ x, direction }: LinkedPreviousSource<PreviousXSource>): LinkedSignalGetter<PreviousXSource, FieldUnitPosition['x'] | null> => {
+const getPreviousXLink = (x: BodyPart['x'], y: BodyPart['y']): LinkedSignalGetter<PreviousSource, FieldUnitPosition['x'] | null> => {
     /** позволяет избежать инитного значения */
     let firstRun = true;
-    // TODO не коррекнтнео. ПЕРЕДЕЛВАТЬ!!!
-    return createLinkedSignal<PreviousXSource, FieldUnitPosition['x'] | null>(
-        () => ({ x: x(), direction: direction() }),
-        (source, previous) => {
-            const last = previous?.source?.x;
-            if (last) {
-                return last;
-            }
-
+    return createLinkedSignal<PreviousSource, FieldUnitPosition['x'] | null>(
+        () => ({ previousX: x(), previousY: y() }),
+        (_source, previous) => {
             if (firstRun) {
                 firstRun = false;
-                return null;
+                return null
             }
 
-            return source.x;
+            const { previousX } = previous?.source ?? { previousX: x() };
+            return previousX;
         }
     );
 }
 
 /**
- * Links for previousY of body parts, based on the position and direction of the parent part. 
- * If the source value is not available (e.g. during the first computation), 
- * it falls back to calculating the previous position based on the current position and direction of movement.
+ * Links for previousY of body parts, based on the position of the parent part.
  */
-const getPreviousYLink = ({ y, direction }: LinkedPreviousSource<PreviousYSource>): LinkedSignalGetter<PreviousYSource, FieldUnitPosition['y'] | null> => {
+const getPreviousYLink = (x: BodyPart['x'], y: BodyPart['y']): LinkedSignalGetter<PreviousSource, FieldUnitPosition['y'] | null> => {
     /** позволяет избежать инитного значения */
     let firstRun = true;
-    return createLinkedSignal<PreviousYSource, FieldUnitPosition['y'] | null>(
-        () => ({ y: y(), direction: direction() }),
-        (source, previous) => {
-            const last = previous?.source?.y;
-            if (last) {
-                return last;
-            }
-
+    return createLinkedSignal<PreviousSource, FieldUnitPosition['x'] | null>(
+        () => ({ previousX: x(), previousY: y() }),
+        (_source, previous) => {
             if (firstRun) {
                 firstRun = false;
-                return null;
+                return null
             }
 
-            return source.y;
+            const { previousY } = previous?.source ?? { previousY: x() };
+            return previousY;
         }
     );
 }

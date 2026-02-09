@@ -43,8 +43,26 @@ const main = (root: HTMLElement): void => {
 
     const headIntersection = field.intersection();
 
+    untracked(() => {
+        let node: Head | Tail | null = head;
+        let count = 0;
+        while (node) {
+            console.log(
+                `Type: ${Object.hasOwn(node, 'move') ? 'Head' : `${'-'.repeat(count)}> Tail`}; x: [${node.x()}]{${node.previousX()}}, y: [${node.y()}]{${node.previousY()}}, direction: [${node.direction()}];`,
+            );
+            node = node.next;
+            count++;
+        }
+        // console.log(`Food position: x: [${food.x()}], y: [${food.y()}]`);
+        console.log('-----------------');
+    })
+
     // TODO wrap to react function
-    switch (headIntersection?.type) {
+    if (!headIntersection) {
+        return;
+    }
+
+    switch (headIntersection.type) {
         case IntersectionType.HeadToFood: {
             const tail = head.eat();
 
@@ -71,20 +89,6 @@ const main = (root: HTMLElement): void => {
             break;
         }
     }
-
-    untracked(() => {
-        let node: Head | Tail | null = head;
-        let count = 0;
-        while (node) {
-            console.log(
-                `Type: ${Object.hasOwn(node, 'move') ? 'Head' : `${'-'.repeat(count)}> Tail`}; x: [${node.x()}]{${node.previousX()}}, y: [${node.y()}]{${node.previousY()}}, direction: [${node.direction()}];`,
-            );
-            node = node.next;
-            count++;
-        }
-        // console.log(`Food position: x: [${food.x()}], y: [${food.y()}]`);
-        console.log('-----------------');
-    })
 }
 
 let onlyOnce = 0;
@@ -106,11 +110,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (onlyOnce < 1) {
-                // IMPORTANT TO DESCRIBE
-                watch.run();
-                onlyOnce += 1;
-            }
+            // if (onlyOnce < 1) {
+            // IMPORTANT TO DESCRIBE
+            watch.run();
+            //     onlyOnce += 1;
+            // }
 
         },
         true,

@@ -1,20 +1,18 @@
 import { createSignal, createWatch, isInNotificationPhase } from "../@angular/signals";
 
 import type { FieldUnitPosition } from "../models/field-unit.interface";
-import { DEFAULT_STEP, IntersectionType, type Field, type HeadIntersection, type HeadToBodyIntersection, type HeadToFoodIntersection } from "../models/field.interface";
+import { DEFAULT_STEP, type Field, type HeadIntersection, type HeadToBodyIntersection, type HeadToFoodIntersection } from "../models/field.interface";
 import { isHead, type Head, type Tail } from "./body-part";
 import { Direction, getOppositeDirection, getSideDirections, type DirectionType } from "./direction";
 import { type Food } from "./food";
-
-type PositionKey = `${FieldUnitPosition['x']}::${FieldUnitPosition['y']}`;
 
 /**
  * @param width - number of FieldUnits in x direction (not px)
  * @param height - number of FieldUnits in y direction (not px)
  */
 export const createField = (width: number, height: number): Field => {
-    const bodyParts = new Map<PositionKey, Head | Tail>();
-    const foodUnits = new Map<PositionKey, Food>();
+    const bodyParts = new Set<Head | Tail>();
+    const foodUnits = new Set<Food>();
 
     let head: Head | null = null;
     let tail: Tail | null = null;
@@ -49,7 +47,7 @@ export const createField = (width: number, height: number): Field => {
         true
     );
 
-    const contains: Field['contains'] = (bodyPart) => bodyParts.has(bodyPart.x() + "::" + bodyPart.y() as PositionKey);
+    const contains: Field['contains'] = (bodyPart) => bodyParts.has(bodyPart);
 
     const checkBoundaries = (position: FieldUnitPosition): boolean => (
         position.x >= 0 &&
@@ -72,19 +70,21 @@ export const createField = (width: number, height: number): Field => {
             tail = bodyPart;
         }
 
-        if (!bitMap.takePosition(bodyPart.x(), bodyPart.y())) {
+        const [x, y] = [bodyPart.x(), bodyPart.y()];
+
+        if (bitMap.isPositionTaken(x, y)) {
             console.warn('Attempting to add body part at a position that is already occupied. This may lead to inconsistencies.');
             return;
         }
-        bodyParts.set(bodyPart.x() + "::" + bodyPart.y() as PositionKey, bodyPart);
+
+        bodyParts.add(bodyPart);
+        bitMap.takePosition(x, y);
     };
 
     const dropFood: Field['dropFood'] = (food) => {
         const [x, y] = [food.x(), food.y()];
 
-        let foodKey = `${x}::${y}` as PositionKey;
-
-        if (foodUnits.get(foodKey) === food) {
+        if (foodUnits.has(food)) {
             console.warn('Attempting to drop food that is already present on the field.');
             return;
         }
@@ -106,7 +106,6 @@ export const createField = (width: number, height: number): Field => {
 
             if (newPos) {
                 food.roll(newPos.x - x, newPos.y - y);
-                foodKey = `${x}::${y}` as PositionKey;
             } else {
                 console.warn('Bird took the food before it could be placed on the field.');
                 return;
@@ -120,7 +119,7 @@ export const createField = (width: number, height: number): Field => {
 
         foodMap.takePosition(x, y);
         bitMap.takePosition(x, y);
-        foodUnits.set(foodKey, food);
+        foodUnits.add(food);
     };
 
     const removeBodyPart: Field['removeBodyPart'] = (bodyPart) => {
@@ -129,7 +128,7 @@ export const createField = (width: number, height: number): Field => {
             return
         }
 
-        bodyParts.delete(bodyPart.x() + "::" + bodyPart.y() as PositionKey);
+        bodyParts.delete(bodyPart);
         bitMap.releasePosition(bodyPart.x(), bodyPart.y());
     };
 
@@ -141,8 +140,6 @@ export const createField = (width: number, height: number): Field => {
      * @returns позицию для роста в противоположном или боковых направлениях от `bodyPart.direction()`
      */
     const findGrowthCell: Field['findGrowthCell'] = (bodyPart) => {
-        console.log(bodyPart);
-
         if (!contains(bodyPart)) {
             console.log('BodyPart is not a part of this field');
             return null;
@@ -173,7 +170,7 @@ export const createField = (width: number, height: number): Field => {
             }
         }
 
-        return null
+        return null;
     }
 
     const requestUpdate: Field['requestUpdate'] = () => {
@@ -184,26 +181,27 @@ export const createField = (width: number, height: number): Field => {
         if (!head || !bitMap.isPositionTaken(headPosition.x, headPosition.y)) {
             return null;
         }
+        return null;
 
-        const positionKey = `${headPosition.x}::${headPosition.y}` as PositionKey;
+        // const positionKey = `${headPosition.x}::${headPosition.y}` as PositionKey;
 
-        if (foodMap.isPositionTaken(headPosition.x, headPosition.y)) {
-            const food = foodUnits.get(positionKey);
+        // if (foodMap.isPositionTaken(headPosition.x, headPosition.y)) {
+        //     const food = foodUnits.get(positionKey);
 
-            return food ? {
-                type: IntersectionType.HeadToFood,
-                head,
-                food,
-            } : null;
-        }
+        //     return food ? {
+        //         type: IntersectionType.HeadToFood,
+        //         head,
+        //         food,
+        //     } : null;
+        // }
 
-        const bodyPart = bodyParts.get(positionKey);
+        // const bodyPart = bodyParts.get(positionKey);
 
-        return bodyPart ? {
-            type: IntersectionType.HeadToBody,
-            head,
-            bodyPart,
-        } : null;
+        // return bodyPart ? {
+        //     type: IntersectionType.HeadToBody,
+        //     head,
+        //     bodyPart,
+        // } : null;
     };
 
     const field: Field = {
