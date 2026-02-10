@@ -39,12 +39,19 @@
   background-color: darkkhaki;
 }
 
-
 .snake-part {
   position: absolute;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+
   width: var(--snake-part-sizing, 40px);
   height: var(--snake-part-sizing, 40px);
+
+  transform: translate(var(--snake-part-x-position), var(--snake-part-y-position));
+
+  transition: transform .2s;
+
+  z-index: 1;
 }
 
 .snake-head {

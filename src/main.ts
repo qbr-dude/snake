@@ -7,6 +7,7 @@ import { createField } from "./engine/field";
 import { createFood } from "./engine/food";
 import { IntersectionType, type Field } from "./models/field.interface";
 import { generateField } from "./ui/field.ui";
+import { generateHead } from "./ui/head.ui";
 
 const init = (): { head: Head, field: Field } => {
     // TODO replace all hardcode with config
@@ -87,11 +88,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const { field, head } = init();
 
     const fieldUI = generateField(field);
-    root.append(fieldUI)
+    root.append(fieldUI);
+
+    const headUI = generateHead(head);
+    root.append(headUI.element);
 
     const engineWatcher = createWatch(
         () => {
             main(field, head);
+
+            headUI.positionChange();
         },
         (watch) => {
             if (isInNotificationPhase()) {
