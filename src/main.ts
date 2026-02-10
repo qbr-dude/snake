@@ -6,6 +6,7 @@ import { createHead, createTail, type Head, type Tail } from "./engine/body-part
 import { createField } from "./engine/field";
 import { createFood } from "./engine/food";
 import { IntersectionType, type Field } from "./models/field.interface";
+import { generateField } from "./ui/field.ui";
 
 const init = (): { head: Head, field: Field } => {
     // TODO replace all hardcode with config
@@ -31,9 +32,9 @@ const init = (): { head: Head, field: Field } => {
     return { head, field };
 }
 
-const { field, head } = init();
 
-const main = (root: HTMLElement): void => {
+
+const main = (field: Field, head: Head): void => {
     head.move(direction());
 
     field.requestUpdate();
@@ -83,9 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     bindDirection();
 
+    const { field, head } = init();
+
+    const fieldUI = generateField(field);
+    root.append(fieldUI)
+
     const engineWatcher = createWatch(
         () => {
-            main(root);
+            main(field, head);
         },
         (watch) => {
             if (isInNotificationPhase()) {

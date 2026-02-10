@@ -10,9 +10,35 @@
 
 #app {
   position: relative;
-
-  --snake-part-sizing: 40px;
+  width: 100vw;
+  height: 100vh;
 }
+
+.snake-field {
+  display: grid;
+  width: 100%;
+  height: 100%;
+}
+
+.snake-field-row {
+  width: 100%;
+  display: flex;
+}
+
+.snake-field-cell {
+  flex: 1;
+}
+
+.snake-field-row:nth-child(even) .snake-field-cell:nth-child(odd),
+.snake-field-row:nth-child(odd) .snake-field-cell:nth-child(even) {
+  background-color: burlywood;
+}
+
+.snake-field-row:nth-child(even) .snake-field-cell:nth-child(even),
+.snake-field-row:nth-child(odd) .snake-field-cell:nth-child(odd) {
+  background-color: darkkhaki;
+}
+
 
 .snake-part {
   position: absolute;
