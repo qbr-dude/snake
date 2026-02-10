@@ -1,7 +1,7 @@
 import { createSignal, createWatch, isInNotificationPhase } from "../@angular/signals";
 
 import type { FieldUnitPosition } from "../models/field-unit.interface";
-import { DEFAULT_STEP, type Field, type HeadIntersection, type HeadToBodyIntersection, type HeadToFoodIntersection } from "../models/field.interface";
+import { DEFAULT_STEP, IntersectionType, type Field, type HeadIntersection, type HeadToBodyIntersection, type HeadToFoodIntersection } from "../models/field.interface";
 import { isHead, type Head, type Tail } from "./body-part";
 import { Direction, getOppositeDirection, getSideDirections, type DirectionType } from "./direction";
 import { type Food } from "./food";
@@ -181,27 +181,37 @@ export const createField = (width: number, height: number): Field => {
         if (!head || !bitMap.isPositionTaken(headPosition.x, headPosition.y)) {
             return null;
         }
+
+        if (foodMap.isPositionTaken(headPosition.x, headPosition.y)) {
+            // const food = foodUnits;
+            for (const food of foodUnits) {
+                if (food.x() === head.x() && food.y() === headPosition.y) {
+                    return {
+                        type: IntersectionType.HeadToFood,
+                        head,
+                        food,
+                    }
+                }
+            }
+
+            console.log('Food not found!');
+
+            return null;
+        }
+
+        for (const bodyPart of bodyParts) {
+            if (bodyPart.x() === headPosition.x && bodyPart.y() === headPosition.y) {
+                return {
+                    type: IntersectionType.HeadToBody,
+                    head,
+                    bodyPart
+                }
+            }
+        }
+
+        console.log('Unknown intersection');
+
         return null;
-
-        // const positionKey = `${headPosition.x}::${headPosition.y}` as PositionKey;
-
-        // if (foodMap.isPositionTaken(headPosition.x, headPosition.y)) {
-        //     const food = foodUnits.get(positionKey);
-
-        //     return food ? {
-        //         type: IntersectionType.HeadToFood,
-        //         head,
-        //         food,
-        //     } : null;
-        // }
-
-        // const bodyPart = bodyParts.get(positionKey);
-
-        // return bodyPart ? {
-        //     type: IntersectionType.HeadToBody,
-        //     head,
-        //     bodyPart,
-        // } : null;
     };
 
     const field: Field = {

@@ -14,15 +14,12 @@ const init = (): { head: Head, field: Field } => {
 
     field.appendBodyPart(head);
 
-    // TODO need to set position only inside the field
     let node: Head | Tail = head;
     for (let i = 0; i < 3; i++) {
         node = createTail(
             node,
             (parent) => field.findGrowthCell(parent)
         );
-        console.log(node.x(), node.y());
-
         field.appendBodyPart(node);
     }
 
@@ -42,20 +39,6 @@ const main = (root: HTMLElement): void => {
     field.requestUpdate();
 
     const headIntersection = field.intersection();
-
-    untracked(() => {
-        let node: Head | Tail | null = head;
-        let count = 0;
-        while (node) {
-            console.log(
-                `Type: ${Object.hasOwn(node, 'move') ? 'Head' : `${'-'.repeat(count)}> Tail`}; x: [${node.x()}]{${node.previousX()}}, y: [${node.y()}]{${node.previousY()}}, direction: [${node.direction()}];`,
-            );
-            node = node.next;
-            count++;
-        }
-        // console.log(`Food position: x: [${food.x()}], y: [${food.y()}]`);
-        console.log('-----------------');
-    })
 
     // TODO wrap to react function
     if (!headIntersection) {
@@ -91,7 +74,6 @@ const main = (root: HTMLElement): void => {
     }
 }
 
-let onlyOnce = 0;
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.querySelector<HTMLElement>('#app');
 
@@ -110,11 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // if (onlyOnce < 1) {
-            // IMPORTANT TO DESCRIBE
             watch.run();
-            //     onlyOnce += 1;
-            // }
 
         },
         true,
