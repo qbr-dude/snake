@@ -57,3 +57,7 @@
 .snake-head {
   background-color: brown;
 }
+
+.snake-tail {
+  background-color: chocolate;
+}

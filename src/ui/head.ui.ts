@@ -1,21 +1,25 @@
 import { createWatch, isInNotificationPhase, type Watch } from "../@angular/signals";
 
-import type { Head } from "../engine/body-part";
+import { isHead, type Head, type Tail } from "../engine/body-part";
 
-interface HeadUI {
+export interface BodyPartUI {
     element: HTMLElement;
     positionChange: Watch['notify'];
 }
 
-export const generateHead = (head: Head): HeadUI => {
-    const headElement = document.createElement('div');
+export const generateBodyPart = (bodyPart: Head | Tail): BodyPartUI => {
+    const bodyPartElement = document.createElement('div');
 
-    headElement.classList.add('snake-part', 'snake-head');
+    if (isHead(bodyPart)) {
+        bodyPartElement.classList.add('snake-part', 'snake-head');
+    } else {
+        bodyPartElement.classList.add('snake-part', 'snake-tail');
+    }
 
     const positionWatcher = createWatch(
         () => {
-            headElement.style.setProperty('--snake-part-x-position', `${head.x()}`);
-            headElement.style.setProperty('--snake-part-y-position', `${head.y()}`);
+            bodyPartElement.style.setProperty('--snake-part-x-position', `${bodyPart.x()}`);
+            bodyPartElement.style.setProperty('--snake-part-y-position', `${bodyPart.y()}`);
         },
         (watch) => {
             if (isInNotificationPhase()) {
@@ -27,5 +31,5 @@ export const generateHead = (head: Head): HeadUI => {
         false
     )
 
-    return { positionChange: () => positionWatcher.notify(), element: headElement };
+    return { positionChange: () => positionWatcher.notify(), element: bodyPartElement };
 }

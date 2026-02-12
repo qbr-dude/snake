@@ -7,7 +7,7 @@ import { createField } from "./engine/field";
 import { createFood } from "./engine/food";
 import { IntersectionType, type Field } from "./models/field.interface";
 import { generateField } from "./ui/field.ui";
-import { generateHead } from "./ui/head.ui";
+import { generateBodyPart, type BodyPartUI } from "./ui/head.ui";
 
 const init = (): { head: Head, field: Field } => {
     // TODO replace all hardcode with config
@@ -88,15 +88,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const fieldUI = generateField(field);
     root.append(fieldUI.element);
 
-    const headUI = generateHead(head);
-    // TODO connect to Field logic
-    fieldUI.element.append(headUI.element);
+    const uiNodes: BodyPartUI[] = [];
+    let node: Head | Tail | null = head;
+    while (node) {
+        const bodyPartUI = generateBodyPart(node);
+        // TODO connect to Field logic
+        fieldUI.element.append(bodyPartUI.element);
+        uiNodes.push(bodyPartUI);
+        node = node.next;
+    }
 
     const engineWatcher = createWatch(
         () => {
             main(field, head);
 
-            headUI.positionChange();
+            for (const node of uiNodes) {
+                node.positionChange();
+            }
 
             fieldUI.element.style.setProperty('--snake-movement-step-x', `${fieldUI.cellSize.width()}px`);
             fieldUI.element.style.setProperty('--snake-movement-step-y', `${fieldUI.cellSize.height()}px`);
@@ -114,8 +122,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     subscribeNotifierForUpdate(engineWatcher.notify);
 });
-
-
 
 // untracked(() => {
 //     let node: Head | Tail | null = head;
