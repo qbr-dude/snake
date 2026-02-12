@@ -31,8 +31,6 @@ export interface Field {
     /** number of FieldUnits in y direction (not px) */
     height: number;
 
-    // appendFood: (position: { x: number; y: number }) => void;
-
     appendBodyPart: (bodyPart: Head | Tail) => void;
     removeBodyPart: (bodyPart: Head | Tail) => void;
 

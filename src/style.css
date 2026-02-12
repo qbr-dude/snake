@@ -47,7 +47,7 @@
   width: var(--snake-part-sizing, 40px);
   height: var(--snake-part-sizing, 40px);
 
-  transform: translate(var(--snake-part-x-position), var(--snake-part-y-position));
+  transform: translate(calc(var(--snake-part-x-position) * var(--snake-movement-step-x)), calc(var(--snake-part-y-position) * var(--snake-movement-step-y)));
 
   transition: transform .2s;
 

@@ -14,8 +14,8 @@ export const generateHead = (head: Head): HeadUI => {
 
     const positionWatcher = createWatch(
         () => {
-            headElement.style.setProperty('--snake-part-x-position', `${head.x()}px`);
-            headElement.style.setProperty('--snake-part-y-position', `${head.y()}px`);
+            headElement.style.setProperty('--snake-part-x-position', `${head.x()}`);
+            headElement.style.setProperty('--snake-part-y-position', `${head.y()}`);
         },
         (watch) => {
             if (isInNotificationPhase()) {

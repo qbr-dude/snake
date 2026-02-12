@@ -33,8 +33,6 @@ const init = (): { head: Head, field: Field } => {
     return { head, field };
 }
 
-
-
 const main = (field: Field, head: Head): void => {
     head.move(direction());
 
@@ -88,16 +86,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const { field, head } = init();
 
     const fieldUI = generateField(field);
-    root.append(fieldUI);
+    root.append(fieldUI.element);
 
     const headUI = generateHead(head);
-    root.append(headUI.element);
+    // TODO connect to Field logic
+    fieldUI.element.append(headUI.element);
 
     const engineWatcher = createWatch(
         () => {
             main(field, head);
 
             headUI.positionChange();
+
+            fieldUI.element.style.setProperty('--snake-movement-step-x', `${fieldUI.cellSize.width()}px`);
+            fieldUI.element.style.setProperty('--snake-movement-step-y', `${fieldUI.cellSize.height()}px`);
         },
         (watch) => {
             if (isInNotificationPhase()) {
