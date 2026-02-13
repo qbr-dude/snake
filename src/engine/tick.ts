@@ -1,7 +1,8 @@
-import { createSignal, type Watch } from "./@angular/signals";
+import { createSignal, type Watch } from "../@angular/signals";
 
 const defaultInterval = 1_000;
 
+// TODO при увеличении тика - уменьшать шаг
 // Notifier, который будет уведомляться, что произошел тик
 let notifier: Watch['notify'] | undefined = undefined;
 
