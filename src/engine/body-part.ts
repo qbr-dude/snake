@@ -104,7 +104,6 @@ export const createTail = (parent: Head | Tail, positionAdjust?: (parent: Head |
 
     const x = createLinkedSignal<FieldUnitPosition['x'] | null, FieldUnitPosition['x']>(
         () => parent.previousX(),
-        // TODO нужно пофиксить логику positionAdjust + parent last position (getPreviousXLink )
         (previousX) => {
             if (previousX !== null) {
                 return previousX;

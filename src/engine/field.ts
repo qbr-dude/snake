@@ -1,7 +1,7 @@
-import { createSignal, createWatch, isInNotificationPhase } from "../@angular/signals";
+import { createComputed, createSignal } from "../@angular/signals";
 
 import type { FieldUnitPosition } from "../models/field-unit.interface";
-import { DEFAULT_STEP, IntersectionType, type Field, type HeadIntersection, type HeadToBodyIntersection, type HeadToFoodIntersection } from "../models/field.interface";
+import { DEFAULT_STEP, IntersectionType, type Field } from "../models/field.interface";
 import { isHead, type Head, type Tail } from "./body-part";
 import { Direction, getOppositeDirection, getSideDirections, type DirectionType } from "./direction";
 import { type Food } from "./food";
@@ -14,38 +14,34 @@ export const createField = (width: number, height: number): Field => {
     const bodyParts = new Set<Head | Tail>();
     const foodUnits = new Set<Food>();
 
-    let head: Head | null = null;
-    let tail: Tail | null = null;
+    let [snakeHead, setSnakeHead] = createSignal<Head | null>(null);
+    let [snakeTail, setSnakeTail] = createSignal<Tail | null>(null);
 
+    // TODO как то обновлять bitmap
     const bitMap = createBitMap(width, height);
     const foodMap = createBitMap(width, height);
 
-    const [intersection, setIntersection] = createSignal<HeadToBodyIntersection | HeadToFoodIntersection | null>(null);
+    const intersection = createComputed<IntersectionType | null>(() => {
+        const head = snakeHead();
+        const tail = snakeTail();
 
-    const fieldWatcher = createWatch(
-        () => {
-            if (head) {
-                const headPosition = { x: head.x(), y: head.y() };
+        if (!head || !tail) {
+            return null;
+        }
 
-                const intersectionResult = headIntersectsObject(headPosition);
+        const headPosition = { x: head.x(), y: head.y() };
+        const tailPosition = { x: tail.x(), y: tail.y() };
 
-                setIntersection(intersectionResult);
-            }
+        const intersectionResult = computeIntersection(headPosition);
 
-            if (tail) {
-                // const tailPosition = { x: tail.previousX() ?? tail.x(), y: tail.previousY() ?? tail.y() };
-                // bitMap.releasePosition(tailPosition.x, tailPosition.y);
-            }
-        },
-        (watch) => {
-            if (isInNotificationPhase() || !head || !tail) {
-                return;
-            }
+        // Если ок по коллизии, то "сдвигаем" tail
+        if (intersectionResult !== IntersectionType.HeadToBody) {
+            bitMap.takePosition(headPosition.x, tailPosition.y);
+            bitMap.releasePosition(tailPosition.x, tailPosition.y);
+        }
 
-            watch.run();
-        },
-        true
-    );
+        return intersectionResult;
+    });
 
     const contains: Field['contains'] = (bodyPart) => bodyParts.has(bodyPart);
 
@@ -63,13 +59,14 @@ export const createField = (width: number, height: number): Field => {
         }
 
         if (isHead(bodyPart)) {
-            head = bodyPart;
+            setSnakeHead(bodyPart);
         }
 
         if (!bodyPart.next) {
-            tail = bodyPart;
+            setSnakeTail(bodyPart);
         }
 
+        // TODO нужно ли теперь обновлять позицию тут. Мб intersection обработает
         const [x, y] = [bodyPart.x(), bodyPart.y()];
 
         if (bitMap.isPositionTaken(x, y)) {
@@ -125,7 +122,7 @@ export const createField = (width: number, height: number): Field => {
     const removeBodyPart: Field['removeBodyPart'] = (bodyPart) => {
         if (bodyPart.next) {
             console.warn('Attempting to remove body part that has a following part. This may lead to inconsistencies.');
-            return
+            return;
         }
 
         bodyParts.delete(bodyPart);
@@ -173,45 +170,16 @@ export const createField = (width: number, height: number): Field => {
         return null;
     }
 
-    const requestUpdate: Field['requestUpdate'] = () => {
-        fieldWatcher.notify();
-    };
-
-    const headIntersectsObject = (headPosition: FieldUnitPosition): HeadIntersection | null => {
-        if (!head || !bitMap.isPositionTaken(headPosition.x, headPosition.y)) {
+    const computeIntersection = (headPosition: FieldUnitPosition): IntersectionType | null => {
+        if (!bitMap.isPositionTaken(headPosition.x, headPosition.y)) {
             return null;
         }
 
         if (foodMap.isPositionTaken(headPosition.x, headPosition.y)) {
-            // const food = foodUnits;
-            for (const food of foodUnits) {
-                if (food.x() === head.x() && food.y() === headPosition.y) {
-                    return {
-                        type: IntersectionType.HeadToFood,
-                        head,
-                        food,
-                    }
-                }
-            }
-
-            console.log('Food not found!');
-
-            return null;
+            return IntersectionType.HeadToFood;
         }
 
-        for (const bodyPart of bodyParts) {
-            if (bodyPart.x() === headPosition.x && bodyPart.y() === headPosition.y) {
-                return {
-                    type: IntersectionType.HeadToBody,
-                    head,
-                    bodyPart
-                }
-            }
-        }
-
-        console.log('Unknown intersection');
-
-        return null;
+        return IntersectionType.HeadToBody;
     };
 
     const field: Field = {
@@ -222,7 +190,6 @@ export const createField = (width: number, height: number): Field => {
         contains,
         getRandomEmptyFieldUnit,
         findGrowthCell: findGrowthCell,
-        requestUpdate,
         dropFood,
         intersection,
     };
@@ -230,13 +197,11 @@ export const createField = (width: number, height: number): Field => {
     return field;
 }
 
-// TODO maybe make all as Promise
 interface BitMap {
     takePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     releasePosition: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
     getEmptyPosition: () => FieldUnitPosition | null;
     isPositionTaken: (x: FieldUnitPosition['x'], y: FieldUnitPosition['y']) => boolean;
-    debug: () => void;
 }
 
 const createBitMap = (width: number, height: number): BitMap => {
@@ -258,6 +223,8 @@ const createBitMap = (width: number, height: number): BitMap => {
             return false;
         }
 
+        console.log(`taken: [${x}, ${y}]`);
+
         rowBitmaps[y] = setBit(rowBitmaps[y], x);
         rowFreeCounts[y]--;
         totalFree--;
@@ -270,6 +237,8 @@ const createBitMap = (width: number, height: number): BitMap => {
             console.warn(`Position (${x}, ${y}) is not taken.`);
             return false;
         }
+
+        console.log(`released: [${x}, ${y}]`);
 
         rowBitmaps[y] = clearBit(rowBitmaps[y], x);
         rowFreeCounts[y]++;
@@ -323,11 +292,5 @@ const createBitMap = (width: number, height: number): BitMap => {
         takePosition: take,
         releasePosition: release,
         isPositionTaken,
-        debug: () => {
-            console.log("BitMap Debug Info:");
-            for (let i = 0; i < rowBitmaps.length; i++) {
-                console.log(`Row ${i}: ${rowBitmaps[i].toString(2).padStart(width, '0')} (free: ${rowFreeCounts[i]})`);
-            }
-        }
     };
 };

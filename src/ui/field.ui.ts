@@ -1,10 +1,13 @@
 import { createSignal, type SignalGetter } from "../@angular/signals";
+
+import type { FieldUIUnit } from "../models/field-unit.interface";
 import type { Field } from "../models/field.interface";
 
-export interface FieldUI {
-    element: HTMLElement;
+export interface FieldUI extends Omit<FieldUIUnit, 'position'> {
     /** Сколько `px` в ячейке. @todo show this can be a Promise<number> */
     cellSize: CellSizeUI;
+    appendItem: (item: FieldUIUnit) => void;
+    // TODO add remove
 }
 
 export const generateField = (field: Field): FieldUI => {
@@ -16,7 +19,15 @@ export const generateField = (field: Field): FieldUI => {
         fieldElement.append(row);
     }
 
-    return { element: fieldElement, cellSize: getCellSize(field, fieldElement) };
+    const appendItem: FieldUI['appendItem'] = (item) => {
+        fieldElement.append(item.element);
+    }
+
+    return {
+        element: fieldElement,
+        cellSize: getCellSize(field, fieldElement),
+        appendItem,
+    };
 }
 
 function* rowsGenerator(rowCount: number, cellsInRow: number): Generator<HTMLElement> {

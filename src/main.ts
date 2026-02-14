@@ -1,28 +1,39 @@
-import { createWatch, isInNotificationPhase, untracked } from "./@angular/signals";
+import { createComputed, createWatch, isInNotificationPhase, untracked } from "./@angular/signals";
 
-import { subscribeNotifierForUpdate } from "./tick";
+import { subscribeNotifierForUpdate } from "./engine/tick";
 import { bindDirection, direction } from "./engine/direction";
 import { createHead, createTail, type Head, type Tail } from "./engine/body-part";
 import { createField } from "./engine/field";
 import { createFood } from "./engine/food";
 import { IntersectionType, type Field } from "./models/field.interface";
 import { generateField } from "./ui/field.ui";
-import { generateBodyPart, type BodyPartUI } from "./ui/head.ui";
+import { generateBodyPart, type BodyPartUI } from "./ui/body-part.ui";
+import type { FieldUnitPosition } from "./models/field-unit.interface";
 
+const INITIAL_SNAKE_SIZE = 3;
+
+// const state = {
+//     headPosition: 
+// }
+
+// TODO replace all hardcode with config
 const init = (): { head: Head, field: Field } => {
-    // TODO replace all hardcode with config
     const field = createField(20, 20);
-    const head = createHead({ x: 0, y: 0 }, direction());
+    const fieldUI = generateField(field);
 
+    const head = createHead({ x: 0, y: 0 }, direction());
     field.appendBodyPart(head);
 
     let node: Head | Tail = head;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 1; i < INITIAL_SNAKE_SIZE; i++) {
         node = createTail(
             node,
             (parent) => field.findGrowthCell(parent)
         );
+        const ui = generateBodyPart(node);
+
         field.appendBodyPart(node);
+        fieldUI.appendItem(ui);
     }
 
     const randomEmptyPosition = field.getRandomEmptyFieldUnit();
@@ -36,21 +47,28 @@ const init = (): { head: Head, field: Field } => {
 const main = (field: Field, head: Head): void => {
     head.move(direction());
 
-    field.requestUpdate();
+    handleIntersection(field, head);
 
-    const headIntersection = field.intersection();
+    // updateView();
 
-    // TODO wrap to react function
-    if (!headIntersection) {
-        return;
-    }
+    // fieldUI.element.style.setProperty('--snake-movement-step-x', `${fieldUI.cellSize.width()}px`);
+    // fieldUI.element.style.setProperty('--snake-movement-step-y', `${fieldUI.cellSize.height()}px`);
+}
 
-    switch (headIntersection.type) {
+const updatePositions = (head: BodyPartUI): void => {
+
+}
+
+const handleIntersection = (field: Field, head: Head) => {
+    const intersection = field.intersection();
+
+    switch (intersection) {
         case IntersectionType.HeadToFood: {
             const tail = head.eat();
 
             if (tail) {
                 field.appendBodyPart(tail);
+                // fieldUI.appendItem(ui);
             }
 
             const emptyFieldUnit = field.getRandomEmptyFieldUnit();
@@ -63,13 +81,14 @@ const main = (field: Field, head: Head): void => {
 
             break;
         }
+
         case IntersectionType.HeadToBody: {
-            console.log('Game over');
+            console.error('Game over');
             break;
         }
+
         default: {
-            console.log('unknown type')
-            break;
+
         }
     }
 }
@@ -84,30 +103,24 @@ document.addEventListener('DOMContentLoaded', () => {
     bindDirection();
 
     const { field, head } = init();
+    const snapshot = createComputed(() => {
+        const positions: FieldUnitPosition[] = [];
 
-    const fieldUI = generateField(field);
-    root.append(fieldUI.element);
+        let node: Head | Tail | null = head;
+        while (node) {
+            const [x, y] = [node.x(), node.y()];
+            positions.push({ x, y })
+            node = node.next;
+        }
 
-    const uiNodes: BodyPartUI[] = [];
-    let node: Head | Tail | null = head;
-    while (node) {
-        const bodyPartUI = generateBodyPart(node);
-        // TODO connect to Field logic
-        fieldUI.element.append(bodyPartUI.element);
-        uiNodes.push(bodyPartUI);
-        node = node.next;
-    }
+        return positions;
+    });
 
     const engineWatcher = createWatch(
         () => {
             main(field, head);
 
-            for (const node of uiNodes) {
-                node.positionChange();
-            }
-
-            fieldUI.element.style.setProperty('--snake-movement-step-x', `${fieldUI.cellSize.width()}px`);
-            fieldUI.element.style.setProperty('--snake-movement-step-y', `${fieldUI.cellSize.height()}px`);
+            console.log(snapshot());
         },
         (watch) => {
             if (isInNotificationPhase()) {

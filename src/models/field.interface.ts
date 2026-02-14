@@ -9,18 +9,18 @@ export const IntersectionType = {
     HeadToFood: 'head-to-food',
 } as const;
 
+// [!] NOTE видимо даже не нужно выделять тип через название
 export type IntersectionType = typeof IntersectionType[keyof typeof IntersectionType];
 
 export interface HeadToBodyIntersection {
     type: typeof IntersectionType.HeadToBody;
-    head: Head;
-    bodyPart: Tail;
+    position: FieldUnitPosition;
 }
 
+// TODO recreate this 
 export interface HeadToFoodIntersection {
     type: typeof IntersectionType.HeadToFood;
-    head: Head;
-    food: Food;
+    position: FieldUnitPosition;
 }
 
 export type HeadIntersection = HeadToBodyIntersection | HeadToFoodIntersection;
@@ -40,9 +40,7 @@ export interface Field {
     /** @todo rename */
     findGrowthCell: (bodyPartParent: Head | Tail) => FieldUnitPosition | null;
 
-    /** Update Field BitMap */
-    requestUpdate: () => void;
-    intersection: SignalGetter<HeadIntersection | null>;
+    intersection: SignalGetter<IntersectionType | null>;
 
     /** Drop food on the field at the specified position */
     dropFood: (food: Food) => void;

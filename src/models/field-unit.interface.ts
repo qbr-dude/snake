@@ -13,3 +13,25 @@ export interface FieldUnit {
 
     uiScale?: number;
 };
+
+/// UI
+
+interface FieldUIPositionX {
+    property: '--snake-part-x-position';
+    value: string;
+}
+
+interface FieldUIPositionY {
+    property: '--snake-part-y-position';
+    value: string;
+}
+
+export interface FieldUIPosition {
+    x: FieldUIPositionX;
+    y: FieldUIPositionY;
+}
+
+export interface FieldUIUnit {
+    element: HTMLElement;
+    position: SignalGetter<FieldUIPosition>;
+}
