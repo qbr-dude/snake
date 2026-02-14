@@ -5,11 +5,14 @@ export interface FieldUnitPosition {
     y: number;
 }
 
+export type UnitUUID = ReturnType<typeof crypto.randomUUID>;
+
 export interface FieldUnit {
+    readonly uuid: UnitUUID;
     /** Position in field */
-    x: SignalGetter<FieldUnitPosition['x']>;
+    readonly x: SignalGetter<FieldUnitPosition['x']>;
     /** Position in field */
-    y: SignalGetter<FieldUnitPosition['y']>;
+    readonly y: SignalGetter<FieldUnitPosition['y']>;
 
     uiScale?: number;
 };

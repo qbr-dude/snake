@@ -1,4 +1,4 @@
-import { createComputed, createWatch, isInNotificationPhase, untracked } from "./@angular/signals";
+import { createComputed, createWatch, isInNotificationPhase } from "./@angular/signals";
 
 import { subscribeNotifierForUpdate } from "./engine/tick";
 import { bindDirection, direction } from "./engine/direction";
@@ -7,56 +7,77 @@ import { createField } from "./engine/field";
 import { createFood } from "./engine/food";
 import { IntersectionType, type Field } from "./models/field.interface";
 import { generateField } from "./ui/field.ui";
-import { generateBodyPart, type BodyPartUI } from "./ui/body-part.ui";
-import type { FieldUnitPosition } from "./models/field-unit.interface";
+import { generateBodyPart } from "./ui/body-part.ui";
+import type { FieldUnitPosition, UnitUUID } from "./models/field-unit.interface";
 
 const INITIAL_SNAKE_SIZE = 3;
 
-// const state = {
-//     headPosition: 
-// }
+const field = createField(20, 20);
+const fieldUI = generateField(field);
 
-// TODO replace all hardcode with config
-const init = (): { head: Head, field: Field } => {
-    const field = createField(20, 20);
-    const fieldUI = generateField(field);
+const head = createHead({ x: 0, y: 0 }, direction());
+field.appendBodyPart(head);
 
-    const head = createHead({ x: 0, y: 0 }, direction());
-    field.appendBodyPart(head);
+const headUI = generateBodyPart(head);
+fieldUI.appendItem(headUI);
 
-    let node: Head | Tail = head;
-    for (let i = 1; i < INITIAL_SNAKE_SIZE; i++) {
-        node = createTail(
-            node,
-            (parent) => field.findGrowthCell(parent)
-        );
-        const ui = generateBodyPart(node);
+let node: Head | Tail = head;
+for (let i = 0; i < INITIAL_SNAKE_SIZE; i++) {
+    node = createTail(
+        node,
+        (parent) => field.findGrowthCell(parent)
+    );
+    const ui = generateBodyPart(node);
 
-        field.appendBodyPart(node);
-        fieldUI.appendItem(ui);
-    }
-
-    const randomEmptyPosition = field.getRandomEmptyFieldUnit();
-    if (randomEmptyPosition) {
-        field.dropFood(createFood(randomEmptyPosition));
-    }
-
-    return { head, field };
+    field.appendBodyPart(node);
+    fieldUI.appendItem(ui);
 }
 
-const main = (field: Field, head: Head): void => {
+const randomEmptyPosition = field.getRandomEmptyFieldUnit();
+if (randomEmptyPosition) {
+    const food = createFood(randomEmptyPosition);
+    field.dropFood(food);
+}
+
+const snakeSnapshot = createComputed(() => {
+    const positions = new Map<UnitUUID, FieldUnitPosition>();
+
+    let node: Head | Tail | null = head;
+    while (node) {
+        const [x, y] = [node.x(), node.y()];
+        positions.set(node.uuid, { x, y })
+        node = node.next;
+    }
+
+    return positions;
+});
+
+// TODO make `getRenderer` which will return `render`
+const render = (): void => {
+    const snapshot = snakeSnapshot();
+    const field = fieldUI.element;
+
+    for (const [uuid, position] of snapshot) {
+        const elem = field.querySelector<HTMLElement>(`[data-uuid="${uuid}"]`);
+
+        if (!elem) {
+            continue;
+        }
+
+        elem.style.setProperty('--snake-part-x-position', `${position.x}`);
+        elem.style.setProperty('--snake-part-y-position', `${position.y}`);
+    }
+}
+
+const updateFieldView = (): void => {
+    fieldUI.element.style.setProperty('--snake-movement-step-x', `${fieldUI.cellSize.width()}px`);
+    fieldUI.element.style.setProperty('--snake-movement-step-y', `${fieldUI.cellSize.height()}px`);
+}
+
+const main = (): void => {
     head.move(direction());
 
     handleIntersection(field, head);
-
-    // updateView();
-
-    // fieldUI.element.style.setProperty('--snake-movement-step-x', `${fieldUI.cellSize.width()}px`);
-    // fieldUI.element.style.setProperty('--snake-movement-step-y', `${fieldUI.cellSize.height()}px`);
-}
-
-const updatePositions = (head: BodyPartUI): void => {
-
 }
 
 const handleIntersection = (field: Field, head: Head) => {
@@ -102,25 +123,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     bindDirection();
 
-    const { field, head } = init();
-    const snapshot = createComputed(() => {
-        const positions: FieldUnitPosition[] = [];
+    root.append(fieldUI.element);
 
-        let node: Head | Tail | null = head;
-        while (node) {
-            const [x, y] = [node.x(), node.y()];
-            positions.push({ x, y })
-            node = node.next;
-        }
+    const renderWatcher = createWatch(
+        () => {
+            updateFieldView();
+            render();
+        },
+        (watch) => {
+            if (isInNotificationPhase()) {
+                return;
+            }
 
-        return positions;
-    });
+            // TODO will it separate logic and rendering???
+            requestAnimationFrame(() => {
+                watch.run()
+            })
+        },
+        false,
+    )
 
     const engineWatcher = createWatch(
         () => {
-            main(field, head);
+            main();
 
-            console.log(snapshot());
+            // TODO and also run for different cases (like window-resize or else)
+            renderWatcher.notify();
         },
         (watch) => {
             if (isInNotificationPhase()) {
@@ -128,24 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             watch.run();
-
         },
         true,
     );
 
     subscribeNotifierForUpdate(engineWatcher.notify);
 });
-
-// untracked(() => {
-//     let node: Head | Tail | null = head;
-//     let count = 0;
-//     while (node) {
-//         console.log(
-//             `Type: ${Object.hasOwn(node, 'move') ? 'Head' : `${'-'.repeat(count)}> Tail`}; x: [${node.x()}]{${node.previousX()}}, y: [${node.y()}]{${node.previousY()}}, direction: [${node.direction()}];`,
-//         );
-//         node = node.next;
-//         count++;
-//     }
-//     console.log(`Food position: x: [${food.x()}], y: [${food.y()}]`);
-//     console.log('-----------------');
-// })

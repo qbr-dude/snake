@@ -223,7 +223,7 @@ const createBitMap = (width: number, height: number): BitMap => {
             return false;
         }
 
-        console.log(`taken: [${x}, ${y}]`);
+        // console.log(`taken: [${x}, ${y}]`);
 
         rowBitmaps[y] = setBit(rowBitmaps[y], x);
         rowFreeCounts[y]--;
@@ -238,7 +238,7 @@ const createBitMap = (width: number, height: number): BitMap => {
             return false;
         }
 
-        console.log(`released: [${x}, ${y}]`);
+        // console.log(`released: [${x}, ${y}]`);
 
         rowBitmaps[y] = clearBit(rowBitmaps[y], x);
         rowFreeCounts[y]++;

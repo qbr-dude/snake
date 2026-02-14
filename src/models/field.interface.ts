@@ -40,7 +40,7 @@ export interface Field {
     /** @todo rename */
     findGrowthCell: (bodyPartParent: Head | Tail) => FieldUnitPosition | null;
 
-    intersection: SignalGetter<IntersectionType | null>;
+    readonly intersection: SignalGetter<IntersectionType | null>;
 
     /** Drop food on the field at the specified position */
     dropFood: (food: Food) => void;

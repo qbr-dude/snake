@@ -6,8 +6,12 @@ import type { FieldUIPosition, FieldUIUnit } from "../models/field-unit.interfac
 export interface BodyPartUI extends FieldUIUnit { };
 
 // TODO untie of body-part
+// TODO rename
 export const generateBodyPart = (bodyPart: Head | Tail): BodyPartUI => {
     const bodyPartElement = document.createElement('div');
+
+    // TODO data-uuid => const
+    bodyPartElement.setAttribute('data-uuid', bodyPart.uuid);
 
     if (isHead(bodyPart)) {
         bodyPartElement.classList.add('snake-part', 'snake-head');

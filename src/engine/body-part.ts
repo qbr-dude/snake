@@ -6,10 +6,10 @@ import { DEFAULT_DIRECTION, Direction, isXDirection, isYDirection, type Directio
 
 interface BodyPart extends FieldUnit {
     /** Куда направлено "тело" */
-    direction: SignalGetter<DirectionType>;
+    readonly direction: SignalGetter<DirectionType>;
 
-    previousX: SignalGetter<FieldUnitPosition['x'] | null>;
-    previousY: SignalGetter<FieldUnitPosition['y'] | null>;
+    readonly previousX: SignalGetter<FieldUnitPosition['x'] | null>;
+    readonly previousY: SignalGetter<FieldUnitPosition['y'] | null>;
 
     /** Следующая часть тела */
     next: BodyPart | null;
@@ -62,6 +62,7 @@ export const createHead = (position: FieldUnitPosition, initialDirection: Direct
     };
 
     const head = {
+        uuid: crypto.randomUUID(),
         x,
         y,
         direction,
@@ -135,7 +136,15 @@ export const createTail = (parent: Head | Tail, positionAdjust?: (parent: Head |
     const previousX = getPreviousXLink(x, y);
     const previousY = getPreviousYLink(x, y);
 
-    const tail = { x, y, direction, next: null, previousX, previousY } as Tail;
+    const tail = {
+        uuid: crypto.randomUUID(),
+        x,
+        y,
+        direction,
+        next: null,
+        previousX,
+        previousY
+    } as Tail;
 
     // link with parent
     parent.next = tail;

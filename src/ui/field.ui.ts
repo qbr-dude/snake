@@ -81,6 +81,7 @@ const getCellSize = (field: Field, fieldElement: HTMLElement): CellSizeUI => {
         setCellHeight(Math.round(height / field.height));
     }
 
+    // TODO make resize obs signal. update view on its (along with a tick)
     const resizeObs = new ResizeObserver(trackSize);
     resizeObs.observe(fieldElement);
 
